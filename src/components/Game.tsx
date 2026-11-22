@@ -318,7 +318,7 @@ function Board({ era, data }: { era: Era; data: History }) {
       </footer>
 
       {game.month === 0 && !playing && !selected && !done && mode === "tour" && (
-        <div className="panel slide-in absolute top-28 left-4 z-30 w-[min(400px,calc(100%-2rem))] p-6">
+        <div className="panel slide-in absolute top-44 left-4 z-30 lg:top-28 w-[min(400px,calc(100%-2rem))] p-6">
           <p className="num text-xs font-bold text-glow">{era.years}</p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight">{era.name}</h1>
           <p className="mt-2 text-sub">{era.pitch}</p>
