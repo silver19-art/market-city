@@ -1,54 +1,30 @@
 "use client";
 
-import type { Puzzle, Reveal } from "@/lib/daily";
-import { STARTING_CASH, portfolioValue } from "@/lib/engine";
+import { clientId } from "@/lib/client-id";
+import { replayScore, type Puzzle, type Reveal } from "@/lib/daily";
 import type { Era } from "@/lib/eras";
 import { monthLabel, pct } from "@/lib/format";
 import { recordDaily, type Badge } from "@/lib/progress";
+import type { Standing } from "@/lib/standings";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Board, type EndProps } from "./Game";
+import { Countdown, StandingView } from "./StandingView";
 
-interface Entry {
-  rank: number;
-  name: string;
-  ret: number;
-  guessed: boolean;
-  you?: boolean;
-}
-interface Board_ {
-  enabled: boolean;
-  entries: Entry[];
-  total: number;
-  you: Entry | null;
-}
 interface Result {
   day: string;
+  /** The score that counts today (your first finish). */
   ret: number;
+  thisRound: number;
+  alreadyPlayed: boolean;
   marketRet: number | null;
   guessed: boolean;
   guess: string | null;
   reveal: Reveal;
-  saved: boolean;
-  alreadyPlayed: boolean;
-  leaderboard: Board_;
+  standing: Standing | null;
 }
 
 const RESULT_KEY = (day: string) => `market-city-daily-${day}`;
-const NAME_KEY = "market-city-nickname";
-
-function clientId() {
-  try {
-    let id = window.localStorage.getItem("market-city-client");
-    if (!id) {
-      id = crypto.randomUUID();
-      window.localStorage.setItem("market-city-client", id);
-    }
-    return id;
-  } catch {
-    return crypto.randomUUID();
-  }
-}
 
 function readResult(day: string): Result | null {
   try {
@@ -59,7 +35,7 @@ function readResult(day: string): Result | null {
   }
 }
 
-/** The daily Mystery Market: load today's hidden stretch, play it, then submit for the reveal and leaderboard. */
+/** The daily Mystery Market: load today's hidden stretch, play it, then submit for the reveal and see how you compare. */
 export function Daily() {
   const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +65,7 @@ export function Daily() {
         years: "Year unknown",
         start: "",
         end: "",
-        pitch: "A real stretch of market history, with the dates, names and news hidden. Every stock starts at $100.",
+        pitch: "A real two-year stretch of market history. You know the companies, but the dates and news are hidden and every stock starts at $100. Can you tell when it is?",
         lesson: "",
         companies: puzzle.companies,
         events: [],
@@ -136,18 +112,12 @@ export function Daily() {
 }
 
 function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle; onResult: (r: Result) => void }) {
-  const ret = portfolioValue(game, puzzle.prices) / STARTING_CASH - 1;
-  const first = puzzle.spy.find((v) => v != null) ?? null;
-  const last = puzzle.spy[puzzle.spy.length - 1];
-  const marketRet = first && last ? last / first - 1 : null;
+  const trades = game.trades.filter((t) => !t.forced).map((t) => ({ month: t.month, ticker: t.ticker, side: t.side, shares: t.shares }));
+  // Score exactly the way the server will: positions are held to the final month.
+  const scored = replayScore(trades, puzzle.prices);
+  const ret = scored.ok ? scored.ret : 0;
+  const endedEarly = game.month < puzzle.months.length - 1;
   const [guess, setGuess] = useState<string | null>(null);
-  const [name, setName] = useState(() => {
-    try {
-      return window.localStorage.getItem(NAME_KEY) ?? "";
-    } catch {
-      return "";
-    }
-  });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -155,21 +125,10 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
     setBusy(true);
     setErr(null);
     try {
-      window.localStorage.setItem(NAME_KEY, name);
-    } catch {
-      /* fine */
-    }
-    try {
       const res = await fetch("/api/daily/score", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          day: puzzle.day,
-          name,
-          clientId: clientId(),
-          guess,
-          trades: game.trades.filter((t) => !t.forced).map((t) => ({ month: t.month, ticker: t.ticker, side: t.side, shares: t.shares })),
-        }),
+        body: JSON.stringify({ day: puzzle.day, clientId: clientId(), guess, trades }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Couldn’t submit. Try again.");
@@ -193,7 +152,7 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
       <h2 className="mt-1 text-3xl font-extrabold">
         You finished at <span className={ret >= 0 ? "text-up" : "text-down"}>{pct(ret)}</span>
       </h2>
-      {marketRet !== null && <p className="mt-1 text-sub">The market did {pct(marketRet)} over the same 24 months.</p>}
+      {endedEarly && <p className="mt-1 text-sm text-sub">You ended early, so your positions are held to Month {puzzle.months.length} for scoring.</p>}
 
       <h3 className="mt-6 text-sm font-bold text-glow">Which era do you think this was?</h3>
       <div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Your guess">
@@ -211,47 +170,36 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
         ))}
       </div>
 
-      <label className="mt-6 block text-sm font-bold text-glow" htmlFor="nick">
-        Nickname for the leaderboard
-      </label>
-      <input
-        id="nick"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        maxLength={20}
-        placeholder="e.g. RedHawkTrader"
-        className="mt-2 h-11 w-full rounded-xl border border-edge bg-white/5 px-3 text-sm placeholder:text-dim focus:border-glow focus:outline-none"
-      />
-      {err && <p className="mt-2 text-sm text-down">{err}</p>}
+      {err && <p className="mt-3 text-sm text-down">{err}</p>}
       <div className="mt-6 flex flex-wrap gap-3">
-        <button type="button" disabled={!guess || !name.trim() || busy} onClick={submit} className="rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110 disabled:opacity-40">
-          {busy ? "Checking your trades…" : "Submit and reveal the era"}
+        <button type="button" disabled={!guess || busy} onClick={submit} className="rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110 disabled:opacity-40">
+          {busy ? "Checking your trades…" : "Lock in and see how you compare"}
         </button>
         <button type="button" onClick={onClose} className="rounded-xl border border-edge-strong px-5 py-2.5 text-sm font-bold hover:bg-white/5">
           Look at the city first
         </button>
       </div>
-      <p className="mt-4 text-[11px] text-dim">One score per day. The server replays your trades on the real prices to check your score.</p>
+      <p className="mt-4 text-[11px] text-dim">One score per day. The server replays your trades on the real prices to check it.</p>
     </Modal>
   );
 }
 
 function Results({ result, onClose, onReplay, practice = false }: { result: Result; onClose?: () => void; onReplay?: () => void; practice?: boolean }) {
-  const [board, setBoard] = useState<Board_>(result.leaderboard);
+  const [stand, setStand] = useState<Standing | null>(result.standing);
   const [copied, setCopied] = useState(false);
   const [badges] = useState<Badge[]>(() => recordDaily(result.day, result.ret, result.guessed));
 
   useEffect(() => {
-    // Refresh so the board shows everyone who has played since.
-    fetch(`/api/daily/leaderboard?day=${result.day}&me=${encodeURIComponent(clientId())}`)
+    // The distribution keeps growing as more people finish, so refresh it.
+    fetch(`/api/daily/stats?day=${result.day}&me=${encodeURIComponent(clientId())}`)
       .then((r) => r.json())
-      .then((d: Board_) => d.enabled && setBoard(d))
+      .then((d: { standing: Standing | null }) => d.standing && setStand(d.standing))
       .catch(() => {});
   }, [result.day]);
 
-  const you = board.you;
   const share = async () => {
-    const text = `Market City Mystery Market ${result.day}: ${pct(result.ret)}${you ? ` (#${you.rank} of ${board.total})` : ""}${result.guessed ? ", named the era" : ""}. Can you beat it? https://market-city-game.vercel.app/daily`;
+    const better = stand?.percentile != null ? `, better than ${Math.round(stand.percentile * 100)}% of players` : "";
+    const text = `Market City Mystery Market ${result.day}: ${pct(result.ret)}${better}${result.guessed ? ", and I named the era" : ""}. Can you beat it? https://market-city-game.vercel.app/daily`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -262,16 +210,16 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
 
   const body = (
     <>
-      <p className="text-sm font-semibold text-sub">Mystery Market, {result.day}</p>
-      <h2 className="mt-1 text-3xl font-extrabold">
-        It was {result.reveal.eraName}: {monthLabel(result.reveal.from)} to {monthLabel(result.reveal.to)}
-      </h2>
-      <p className="mt-2 text-sub">
-        You finished at <strong className={result.ret >= 0 ? "text-up" : "text-down"}>{pct(result.ret)}</strong>
-        {result.marketRet !== null && <> against the market&apos;s {pct(result.marketRet)}</>}.{" "}
-        {result.guessed ? "And you named the era." : "Your era guess was off this time."}
-        {result.alreadyPlayed && " You'd already played today, so your first score stands."}
+      <p className="text-center text-sm font-semibold text-sub">Mystery Market, {result.day}</p>
+      <p className={`num mt-1 text-center text-6xl font-extrabold ${result.ret >= 0 ? "text-up" : "text-down"}`}>{pct(result.ret)}</p>
+      <p className="mt-2 text-center text-sub">
+        {result.marketRet !== null && <>The market did {pct(result.marketRet)}. </>}
+        It was <strong className="text-text">{result.reveal.eraName}</strong>, {monthLabel(result.reveal.from)} to {monthLabel(result.reveal.to)}.{" "}
+        {result.guessed ? "You named the era." : "Your era guess was off this time."}
       </p>
+      {result.alreadyPlayed && <p className="mt-1 text-center text-xs text-dim">You&apos;d already played today, so your first score ({pct(result.ret)}) is the one that counts.</p>}
+
+      <StandingView standing={stand} audience="today's players" />
 
       {badges.length > 0 && (
         <p className="mt-4 rounded-xl border border-own/40 bg-own/10 p-3 text-sm">
@@ -279,45 +227,7 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
         </p>
       )}
 
-      <h3 className="mt-6 text-sm font-bold text-glow">Today&apos;s leaderboard</h3>
-      {board.enabled ? (
-        <>
-          <ol className="mt-2 divide-y divide-edge overflow-hidden rounded-xl border border-edge">
-            {board.entries.map((e) => (
-              <li key={`${e.rank}-${e.name}`} className={`flex items-center gap-3 px-3 py-2 text-sm ${e.you ? "bg-glow/15" : ""}`}>
-                <span className="num w-7 text-dim">{e.rank}</span>
-                <span className="flex-1 truncate font-semibold">
-                  {e.name}
-                  {e.you && <span className="ml-1 text-xs text-glow">you</span>}
-                </span>
-                {e.guessed && <span className="text-xs text-sub">named the era</span>}
-                <span className={`num w-20 text-right font-bold ${e.ret >= 0 ? "text-up" : "text-down"}`}>{pct(e.ret)}</span>
-              </li>
-            ))}
-          </ol>
-          {you && you.rank > board.entries.length && (
-            <p className="mt-2 text-sm text-sub">
-              You&apos;re #{you.rank} of {board.total}.
-            </p>
-          )}
-          <p className="mt-2 text-[11px] text-dim">Resets at midnight New York time. {board.total} played today.</p>
-        </>
-      ) : (
-        <p className="mt-2 text-sm text-sub">The leaderboard isn&apos;t switched on yet, but your score is saved on this device.</p>
-      )}
-
-      <details className="mt-5 text-sm">
-        <summary className="cursor-pointer font-bold text-glow">Which stock was which</summary>
-        <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sub">
-          {result.reveal.key.map((k) => (
-            <li key={k.label}>
-              <span className="font-bold text-text">Stock {k.label}</span> = {k.name}
-            </li>
-          ))}
-        </ul>
-      </details>
-
-      <div className="mt-6 flex flex-wrap gap-3">
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button type="button" onClick={share} className="rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110">
           {copied ? "Copied to clipboard" : "Copy my result"}
         </button>
@@ -335,8 +245,10 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
           Back to the eras
         </Link>
       </div>
-      {practice && <p className="mt-3 text-[11px] text-dim">This was a practice run. Only your first score counts today.</p>}
-      <p className="mt-2 text-[11px] text-dim">A new Mystery Market opens at midnight New York time.</p>
+      {practice && <p className="mt-3 text-center text-[11px] text-dim">This was a practice run. Only your first score counts today.</p>}
+
+      <Countdown />
+
     </>
   );
 

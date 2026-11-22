@@ -24,7 +24,7 @@ describe("daily mystery market", () => {
     expect(todayKey(new Date("2026-11-22T06:00:00Z"))).toBe("2026-11-22");
   });
 
-  it("hides names and rebases prices to 100", () => {
+  it("shows the companies but rebases prices to 100 and hides the dates", () => {
     const pick = pickPuzzle("2026-11-22");
     const era = eraById(pick.eraId)!;
     const months = monthsBetween(era.start, era.end);
@@ -32,10 +32,10 @@ describe("daily mystery market", () => {
     const { puzzle, reveal } = buildPuzzle("2026-11-22", { months, prices, spy: months.map((_, m) => 50 + m) });
     expect(puzzle.months).toHaveLength(DAILY_MONTHS);
     expect(Object.values(puzzle.prices).every((s) => s[0] === 100)).toBe(true);
-    const shown = JSON.stringify({ ...puzzle, choices: [] });
-    for (const c of era.companies) expect(shown).not.toContain(`"${c.name}"`);
-    expect(Object.keys(puzzle.prices).every((k) => /^[A-Z]$/.test(k))).toBe(true);
-    expect(reveal.key[0].label).toBe("A");
+    expect(puzzle.companies.map((c) => c.ticker).sort()).toEqual(era.companies.map((c) => c.ticker).sort());
+    expect(puzzle.months.every((m) => m.startsWith("M-"))).toBe(true);
+    expect(JSON.stringify(puzzle)).not.toContain(months[pick.offset]);
+    expect(reveal.key[0].ticker).toBe(pick.order[0].ticker);
     expect(reveal.from).toBe(months[pick.offset]);
   });
 

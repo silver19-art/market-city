@@ -1,6 +1,7 @@
 /**
- * The daily Mystery Market: everyone gets the same hidden 24-month stretch of history each day.
- * Dates, names and news are hidden; prices are rebased to $100 so nothing gives the era away.
+ * The daily Mystery Market: everyone gets the same 24-month stretch of history each day.
+ * You see which companies you're trading, but the dates and news are hidden and prices are
+ * rebased to $100, so you have to work out when it is from how the market behaves.
  */
 import { advance, buy, cover, newGame, portfolioValue, sell, short, STARTING_CASH, type GameState, type Prices, type Trade } from "./engine";
 import { ERAS, eraById, monthsBetween, type Company, type Sector } from "./eras";
@@ -37,7 +38,7 @@ export interface PuzzlePick {
   eraId: string;
   /** Index of the first month within the era. */
   offset: number;
-  /** Era companies in the order they get the letters A, B, C… */
+  /** Era companies in a shuffled order for the day. */
   order: Company[];
   /** Four era ids for the "which era was it?" question, one of them correct. */
   choices: string[];
@@ -58,7 +59,6 @@ export function pickPuzzle(day: string): PuzzlePick {
   return { eraId: era.id, offset, order, choices };
 }
 
-export const letter = (i: number) => String.fromCharCode(65 + i);
 export const mysteryMonths = () => Array.from({ length: DAILY_MONTHS }, (_, i) => `M-${String(i + 1).padStart(2, "0")}`);
 
 export interface Puzzle {
@@ -94,11 +94,10 @@ export function buildPuzzle(day: string, era: { months: string[]; prices: Prices
   const key: Reveal["key"] = [];
   pick.order
     .filter((c) => era.prices[c.ticker] && slice(era.prices[c.ticker]).some((v) => v != null))
-    .forEach((c, i) => {
-      const label = letter(i);
-      prices[label] = rebase(slice(era.prices[c.ticker]));
-      companies.push({ ticker: label, name: `Stock ${label}`, sector: c.sector });
-      key.push({ label, ticker: c.ticker, name: c.name });
+    .forEach((c) => {
+      prices[c.ticker] = rebase(slice(era.prices[c.ticker]));
+      companies.push({ ticker: c.ticker, name: c.name, sector: c.sector });
+      key.push({ label: c.ticker, ticker: c.ticker, name: c.name });
     });
   const window = era.months.slice(pick.offset, pick.offset + DAILY_MONTHS);
   return {

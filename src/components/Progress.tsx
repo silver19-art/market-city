@@ -39,11 +39,11 @@ export function DailyCard() {
         <p className="text-xs font-bold text-glow">New every day</p>
         <p className="sign mt-1 text-3xl font-extrabold">Mystery Market</p>
         <p className="mt-2 text-sub">
-          A hidden two-year stretch of real history. Names, dates and news are secret. Trade blind, beat the market, guess the era, and climb today&apos;s leaderboard.
+          A real two-year stretch of history with the dates and news hidden. Trade the companies, beat the market, guess the era, and see how you rank against everyone who played today.
         </p>
       </div>
       <span className="rounded-xl bg-glow px-5 py-3 text-sm font-extrabold text-night group-hover:brightness-110">
-        {played ? `You scored ${pct(played.ret)}. See the leaderboard` : "Play today's market"}
+        {played ? `You scored ${pct(played.ret)}. See how you compare` : "Play today's market"}
       </span>
     </Link>
   );

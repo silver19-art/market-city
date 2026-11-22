@@ -4,11 +4,44 @@ import { priceAt, report, type GameState, type Prices } from "@/lib/engine";
 import { benchmarkLong, benchmarkName, unitName, type Era } from "@/lib/eras";
 import { monthLabel, pct, usd } from "@/lib/format";
 import Link from "next/link";
+import { clientId } from "@/lib/client-id";
 import { recordRound, type Badge } from "@/lib/progress";
+import type { Standing } from "@/lib/standings";
+import { StandingView } from "./StandingView";
 import { useEffect, useState } from "react";
 
-// Each finished round is recorded once, even if the report is closed and reopened.
+// Each finished round is recorded and submitted once, even if the report is closed and reopened.
 const recorded = new WeakMap<GameState, Badge[]>();
+const submitted = new WeakMap<GameState, Promise<Standing | null>>();
+
+function submitRound(eraId: string, game: GameState) {
+  let p = submitted.get(game);
+  if (!p) {
+    const trades = game.trades.filter((t) => !t.forced).map((t) => ({ month: t.month, ticker: t.ticker, side: t.side, shares: t.shares }));
+    p = fetch("/api/era/score", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ era: eraId, clientId: clientId(), trades }) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { standing: Standing | null } | null) => d?.standing ?? null)
+      .catch(() => null);
+    submitted.set(game, p);
+  }
+  return p;
+}
+
+/** How this round compares with everyone who has played the era (only for rounds played to the end). */
+function EraStanding({ eraId, game, finished }: { eraId: string; game: GameState; finished: boolean }) {
+  const [stand, setStand] = useState<Standing | null | undefined>(undefined);
+  useEffect(() => {
+    if (!finished) return;
+    let live = true;
+    submitRound(eraId, game).then((s) => live && setStand(s));
+    return () => {
+      live = false;
+    };
+  }, [eraId, game, finished]);
+  if (!finished) return <p className="mt-6 text-sm text-sub">Play a round all the way to the end to see how you compare with everyone else who played this era.</p>;
+  if (stand === undefined) return <p className="mt-6 text-center text-sm text-sub">Comparing with other players…</p>;
+  return <StandingView standing={stand} audience="everyone who's played this era" />;
+}
 
 /** Did any short in this round make money (realized plus what's still open)? */
 function shortProfit(game: GameState, prices: Prices) {
@@ -131,6 +164,8 @@ export function Report({
             )}
           </p>
         )}
+
+        <EraStanding eraId={era.id} game={game} finished={game.month >= months.length - 1} />
 
         {newBadges.length > 0 && (
           <div className="mt-7 rounded-xl border border-own/40 bg-own/10 p-4">
