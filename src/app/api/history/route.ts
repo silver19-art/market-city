@@ -60,6 +60,10 @@ async function french(file: string) {
 async function loadEra(id: string) {
   "use cache";
   cacheLife("max");
+  return fetchEra(id);
+}
+
+async function fetchEra(id: string) {
   const era = eraById(id);
   if (!era) throw new Error("unknown era");
   const months = monthsBetween(era.start, era.end);
@@ -101,10 +105,12 @@ async function loadEra(id: string) {
 }
 
 export async function GET(request: Request) {
-  const id = new URL(request.url).searchParams.get("era") ?? "";
+  const url = new URL(request.url);
+  const id = url.searchParams.get("era") ?? "";
   if (!eraById(id)) return Response.json({ error: "Unknown era" }, { status: 404 });
   try {
-    const data = await loadEra(id);
+    // ?fresh=1 skips the cache, which also lets a failure explain itself.
+    const data = url.searchParams.has("fresh") ? await fetchEra(id) : await loadEra(id);
     return Response.json(data, { headers: { "cache-control": "public, s-maxage=86400, stale-while-revalidate=604800" } });
   } catch (e) {
     return Response.json({ error: "Couldn’t load prices right now. Try again in a minute.", detail: e instanceof Error ? e.message : String(e) }, { status: 503 });
