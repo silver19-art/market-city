@@ -7,6 +7,8 @@ export const pct = (n: number, digits = 1, sign = true) => `${sign && n > 0 ? "+
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 export const monthLabel = (ym: string, long = false) => {
+  // Mystery Market months are "M-07" so the real date stays hidden.
+  if (ym.startsWith("M-")) return `Month ${Number(ym.slice(2))}`;
   const [y, m] = ym.split("-").map(Number);
   return long ? `${["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][m - 1]} ${y}` : `${MONTHS[m - 1]} ${y}`;
 };

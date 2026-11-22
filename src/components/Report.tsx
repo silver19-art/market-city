@@ -1,10 +1,24 @@
 "use client";
 
-import { report, type GameState, type Prices } from "@/lib/engine";
+import { priceAt, report, type GameState, type Prices } from "@/lib/engine";
 import { benchmarkLong, benchmarkName, unitName, type Era } from "@/lib/eras";
 import { monthLabel, pct, usd } from "@/lib/format";
 import Link from "next/link";
-import { useEffect } from "react";
+import { recordRound, type Badge } from "@/lib/progress";
+import { useEffect, useState } from "react";
+
+// Each finished round is recorded once, even if the report is closed and reopened.
+const recorded = new WeakMap<GameState, Badge[]>();
+
+/** Did any short in this round make money (realized plus what's still open)? */
+function shortProfit(game: GameState, prices: Prices) {
+  const shorted = new Set(game.trades.filter((t) => t.side === "short").map((t) => t.ticker));
+  return [...shorted].some((tk) => {
+    let pnl = 0;
+    for (const t of game.trades) if (t.ticker === tk) pnl += (t.side === "sell" || t.side === "short" ? 1 : -1) * t.shares * t.price;
+    return pnl + (game.shares[tk] ?? 0) * (priceAt(prices, tk, game.month) ?? 0) > 0;
+  });
+}
 
 function Bar({ label, value, max, you = false }: { label: string; value: number; max: number; you?: boolean }) {
   const w = max > 0 ? Math.max(2, (Math.abs(value) / max) * 100) : 2;
@@ -45,6 +59,10 @@ export function Report({
   }, [onClose]);
   const r = report(game, prices, spy, era.companies.map((c) => c.ticker));
   const bench = benchmarkName(era) === "S&P 500" ? "S&P 500" : "stock market";
+  const [newBadges] = useState(() => {
+    if (!recorded.has(game)) recorded.set(game, recordRound(era.id, r.totalReturn, r.benchmarkReturn !== null && r.totalReturn > r.benchmarkReturn, shortProfit(game, prices)));
+    return recorded.get(game)!;
+  });
   const comps = [r.totalReturn, r.benchmarkReturn ?? 0, r.equalWeightReturn ?? 0];
   const max = Math.max(...comps.map(Math.abs), 0.01);
   const verdict =
@@ -114,6 +132,18 @@ export function Report({
           </p>
         )}
 
+        {newBadges.length > 0 && (
+          <div className="mt-7 rounded-xl border border-own/40 bg-own/10 p-4">
+            <p className="text-sm font-bold text-own">New badge{newBadges.length > 1 ? "s" : ""}</p>
+            <ul className="mt-1 space-y-0.5 text-sm">
+              {newBadges.map((b) => (
+                <li key={b.id}>
+                  <strong>{b.name}</strong> <span className="text-sub">{b.how.toLowerCase()}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <h3 className="mt-7 text-sm font-bold tracking-wide text-glow">What this round teaches</h3>
         <ul className="mt-3 space-y-3 text-sm leading-relaxed text-sub">
           {lessons.map((l) => (

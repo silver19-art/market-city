@@ -5,7 +5,7 @@ import { benchmarkName, eraById, unitName, type Era } from "@/lib/eras";
 import { monthLabel, pct, usd } from "@/lib/format";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CamMode } from "./city/CameraRig";
 import { Report } from "./Report";
 import { StockPanel } from "./StockPanel";
@@ -15,7 +15,7 @@ const City = dynamic(() => import("./City"), {
   loading: () => <div className="grid h-full place-items-center text-sub">Building the city…</div>,
 });
 
-interface History {
+export interface History {
   months: string[];
   prices: Prices;
   spy: (number | null)[];
@@ -81,7 +81,13 @@ export function Game({ eraId }: { eraId: string }) {
   return <Board era={era} data={data} />;
 }
 
-function Board({ era, data }: { era: Era; data: History }) {
+export interface EndProps {
+  game: GameState;
+  onClose: () => void;
+  onReplay: () => void;
+}
+
+export function Board({ era, data, renderEnd }: { era: Era; data: History; renderEnd?: (p: EndProps) => ReactNode }) {
   const { months, prices, spy } = data;
   const companies = useMemo(() => era.companies.filter((c) => prices[c.ticker]), [era, prices]);
   const last = months.length - 1;
@@ -358,7 +364,13 @@ function Board({ era, data }: { era: Era; data: History }) {
         </div>
       )}
 
-      {done && reportOpen && <Report era={era} game={game} prices={prices} spy={spy} months={months} onReplay={replay} onClose={() => setReportOpen(false)} />}
+      {done &&
+        reportOpen &&
+        (renderEnd ? (
+          renderEnd({ game, onClose: () => setReportOpen(false), onReplay: replay })
+        ) : (
+          <Report era={era} game={game} prices={prices} spy={spy} months={months} onReplay={replay} onClose={() => setReportOpen(false)} />
+        ))}
     </div>
   );
 }

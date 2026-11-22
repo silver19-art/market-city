@@ -1,4 +1,5 @@
 import { ERAS } from "@/lib/eras";
+import { DailyCard, EraProgress, ProgressPanel } from "@/components/Progress";
 import Link from "next/link";
 
 /** A Manhattan skyline at night with a suspension bridge, drawn from a fixed seed so it never changes. */
@@ -134,6 +135,9 @@ export default function Home() {
         <Skyline />
       </div>
 
+      <DailyCard />
+      <ProgressPanel />
+
       <h2 className="mt-14 text-xl font-extrabold tracking-tight">Choose an era, from 1928 to today</h2>
       <ul className="mt-5 grid gap-4 sm:grid-cols-2">
         {ERAS.map((e) => (
@@ -143,6 +147,7 @@ export default function Home() {
               <span className="sign mt-1 text-3xl font-extrabold">{e.name}</span>
               <span className="mt-2 text-sub">{e.pitch}</span>
               {e.source === "industries" && <span className="mt-2 text-xs text-dim">Before stock-by-stock records, so each tower is a whole industry.</span>}
+              <EraProgress id={e.id} />
               <span className="mt-4 flex flex-wrap gap-1.5">
                 {e.companies.slice(0, 7).map((c) => (
                   <span key={c.ticker} className="rounded-md bg-white/5 px-2 py-0.5 text-[11px] font-bold text-sub">
