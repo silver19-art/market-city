@@ -9,6 +9,8 @@ import { clientId } from "@/lib/client-id";
 import { recordRound, type Badge } from "@/lib/progress";
 import type { Standing } from "@/lib/standings";
 import { StandingView } from "./StandingView";
+import { LearnLinks } from "./LearnLinks";
+import { LEARN } from "@/lib/learn";
 import { useEffect, useState } from "react";
 
 // Each finished round is recorded and submitted once, even if the report is closed and reopened.
@@ -190,6 +192,8 @@ export function Report({
             </li>
           ))}
         </ul>
+
+        <LearnLinks links={LEARN[era.id] ?? []} />
 
         <div className="mt-8 flex flex-wrap gap-3">
           <button type="button" onClick={onReplay} className="rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110">

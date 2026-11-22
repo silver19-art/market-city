@@ -1,7 +1,7 @@
 /**
  * The daily Mystery Market: everyone gets the same 24-month stretch of US market history each day,
  * picked from anywhere between 1927 and today. You see what you're trading, but the dates and news
- * are hidden and prices are rebased to $100, so you have to work out when it is.
+ * are hidden until the end and prices are rebased to $100.
  * Before 1985 the towers are industries (free stock-by-stock data starts then); after, real companies.
  */
 import { advance, buy, cover, newGame, portfolioValue, sell, short, STARTING_CASH, type GameState, type Prices, type Trade } from "./engine";
@@ -94,10 +94,6 @@ export const STOCK_POOL: Company[] = [
   { ticker: "DAL", name: "Delta Air Lines", sector: "Travel" },
 ];
 
-const DECADES = Array.from({ length: 11 }, (_, i) => 1920 + i * 10);
-export const decadeId = (year: number) => `${Math.floor(year / 10) * 10}s`;
-export const decadeName = (id: string) => `The ${id}`;
-
 function addMonths(ym: string, n: number) {
   const [y, m] = ym.split("-").map(Number);
   const t = y * 12 + (m - 1) + n;
@@ -108,10 +104,6 @@ export interface PuzzlePick {
   start: string;
   end: string;
   kind: "industries" | "stocks";
-  /** The decade the middle of the window falls in, e.g. "1970s". */
-  decade: string;
-  /** Four decades to choose from, one of them correct. */
-  choices: string[];
   /** Shuffled candidates; the server keeps up to 16 that are trading at the start. */
   pool: Company[];
 }
@@ -123,12 +115,7 @@ export function pickPuzzle(day: string): PuzzlePick {
   const start = addMonths(FIRST_START, Math.floor(rand() * span));
   const end = addMonths(start, DAILY_MONTHS - 1);
   const kind = start < STOCKS_FROM ? "industries" : "stocks";
-  const decade = decadeId(Number(addMonths(start, DAILY_MONTHS / 2).slice(0, 4)));
-  const others = shuffle(
-    DECADES.map((d) => `${d}s`).filter((d) => d !== decade),
-    rand,
-  ).slice(0, 3);
-  return { start, end, kind, decade, choices: shuffle([decade, ...others], rand), pool: shuffle(kind === "industries" ? INDUSTRY_POOL : STOCK_POOL, rand) };
+  return { start, end, kind, pool: shuffle(kind === "industries" ? INDUSTRY_POOL : STOCK_POOL, rand) };
 }
 
 export const mysteryMonths = () => Array.from({ length: DAILY_MONTHS }, (_, i) => `M-${String(i + 1).padStart(2, "0")}`);
@@ -139,17 +126,14 @@ export interface Puzzle {
   prices: Prices;
   spy: (number | null)[];
   companies: { ticker: string; name: string; sector: Sector }[];
-  choices: { id: string; name: string; years: string }[];
   source: "industries" | "stocks";
 }
 
 export interface Reveal {
-  eraId: string;
-  eraName: string;
   from: string;
   to: string;
   /** A named era from the main game that this stretch overlaps, if any. */
-  during: string | null;
+  during: { id: string; name: string } | null;
   key: { label: string; ticker: string; name: string }[];
 }
 
@@ -171,7 +155,7 @@ export function buildPuzzle(day: string, window: { months: string[]; prices: Pri
   const chosen = [...trading, ...later].slice(0, 16);
   const prices: Prices = {};
   for (const c of chosen) prices[c.ticker] = rebase(window.prices[c.ticker]);
-  const during = ERAS.find((e) => e.region !== "world" && e.start <= pick.end && e.end >= pick.start)?.name ?? null;
+  const era = ERAS.find((e) => e.region !== "world" && e.start <= pick.end && e.end >= pick.start);
   return {
     puzzle: {
       day,
@@ -179,15 +163,12 @@ export function buildPuzzle(day: string, window: { months: string[]; prices: Pri
       prices,
       spy: rebase(window.market),
       companies: chosen.map((c) => ({ ticker: c.ticker, name: c.name, sector: c.sector })),
-      choices: pick.choices.map((id) => ({ id, name: decadeName(id), years: `${id.slice(0, 4)}–${Number(id.slice(0, 4)) + 9}` })),
       source: pick.kind,
     },
     reveal: {
-      eraId: pick.decade,
-      eraName: decadeName(pick.decade),
       from: pick.start,
       to: pick.end,
-      during,
+      during: era ? { id: era.id, name: era.name } : null,
       key: chosen.map((c) => ({ label: c.ticker, ticker: c.ticker, name: c.name })),
     },
   };

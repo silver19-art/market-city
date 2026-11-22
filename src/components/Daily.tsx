@@ -4,11 +4,13 @@ import { clientId } from "@/lib/client-id";
 import { replayScore, type Puzzle, type Reveal } from "@/lib/daily";
 import type { Era } from "@/lib/eras";
 import { monthLabel, pct } from "@/lib/format";
+import { learnForWindow } from "@/lib/learn";
 import { recordDaily, type Badge } from "@/lib/progress";
 import type { Standing } from "@/lib/standings";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Board, type EndProps } from "./Game";
+import { LearnLinks } from "./LearnLinks";
 import { Countdown, StandingView } from "./StandingView";
 
 interface Result {
@@ -18,13 +20,11 @@ interface Result {
   thisRound: number;
   alreadyPlayed: boolean;
   marketRet: number | null;
-  guessed: boolean;
-  guess: string | null;
   reveal: Reveal;
   standing: Standing | null;
 }
 
-const RESULT_KEY = (day: string) => `market-city-daily-${day}`;
+const RESULT_KEY = (day: string) => `market-city-daily-v3-${day}`;
 
 function readResult(day: string): Result | null {
   try {
@@ -67,8 +67,8 @@ export function Daily() {
         end: "",
         pitch:
           puzzle.source === "industries"
-            ? "A real two-year stretch of US market history from before 1985, so the towers are whole industries. The dates and news are hidden and everything starts at $100. Can you tell when it is?"
-            : "A real two-year stretch of US market history since 1985. You know the companies, but the dates and news are hidden and every stock starts at $100. Can you tell when it is?",
+            ? "A real two-year stretch of US market history from before 1985, so the towers are whole industries. The dates and news stay hidden until the end, and everything starts at $100."
+            : "A real two-year stretch of US market history since 1985. You know the companies, but the dates and news stay hidden until the end, and every stock starts at $100.",
         lesson: "",
         companies: puzzle.companies,
         source: puzzle.source,
@@ -121,7 +121,6 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
   const scored = replayScore(trades, puzzle.prices);
   const ret = scored.ok ? scored.ret : 0;
   const endedEarly = game.month < puzzle.months.length - 1;
-  const [guess, setGuess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -132,11 +131,11 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
       const res = await fetch("/api/daily/score", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ day: puzzle.day, clientId: clientId(), guess, trades }),
+        body: JSON.stringify({ day: puzzle.day, clientId: clientId(), trades }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Couldn’t submit. Try again.");
-      const r: Result = { ...d, guess };
+      const r: Result = d;
       try {
         window.localStorage.setItem(RESULT_KEY(puzzle.day), JSON.stringify(r));
       } catch {
@@ -158,26 +157,10 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
       </h2>
       {endedEarly && <p className="mt-1 text-sm text-sub">You ended early, so your positions are held to Month {puzzle.months.length} for scoring.</p>}
 
-      <h3 className="mt-6 text-sm font-bold text-glow">Which decade do you think this was?</h3>
-      <div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Your guess">
-        {puzzle.choices.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            role="radio"
-            aria-checked={guess === c.id}
-            onClick={() => setGuess(c.id)}
-            className={`rounded-xl border px-3 py-2 text-left text-sm ${guess === c.id ? "border-glow bg-glow/15" : "border-edge hover:bg-white/5"}`}
-          >
-            <span className="font-bold">{c.name}</span> <span className="text-sub">{c.years}</span>
-          </button>
-        ))}
-      </div>
-
       {err && <p className="mt-3 text-sm text-down">{err}</p>}
       <div className="mt-6 flex flex-wrap gap-3">
-        <button type="button" disabled={!guess || busy} onClick={submit} className="rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110 disabled:opacity-40">
-          {busy ? "Checking your trades…" : "Lock in and see how you compare"}
+        <button type="button" disabled={busy} onClick={submit} className="rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110 disabled:opacity-40">
+          {busy ? "Checking your trades…" : "Reveal the time period"}
         </button>
         <button type="button" onClick={onClose} className="rounded-xl border border-edge-strong px-5 py-2.5 text-sm font-bold hover:bg-white/5">
           Look at the city first
@@ -191,7 +174,7 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
 function Results({ result, onClose, onReplay, practice = false }: { result: Result; onClose?: () => void; onReplay?: () => void; practice?: boolean }) {
   const [stand, setStand] = useState<Standing | null>(result.standing);
   const [copied, setCopied] = useState(false);
-  const [badges] = useState<Badge[]>(() => recordDaily(result.day, result.ret, result.guessed));
+  const [badges] = useState<Badge[]>(() => recordDaily(result.day, result.ret, result.marketRet !== null && result.ret > result.marketRet));
 
   useEffect(() => {
     // The distribution keeps growing as more people finish, so refresh it.
@@ -203,7 +186,7 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
 
   const share = async () => {
     const better = stand?.percentile != null ? `, better than ${Math.round(stand.percentile * 100)}% of players` : "";
-    const text = `Market City Mystery Market ${result.day}: ${pct(result.ret)}${better}${result.guessed ? ", and I named the decade" : ""}. Can you beat it? https://market-city-game.vercel.app/daily`;
+    const text = `Market City Mystery Market ${result.day}: ${pct(result.ret)}${better}. Can you beat it? https://market-city-game.vercel.app/daily`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -216,11 +199,13 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
     <>
       <p className="text-center text-sm font-semibold text-sub">Mystery Market, {result.day}</p>
       <p className={`num mt-1 text-center text-6xl font-extrabold ${result.ret >= 0 ? "text-up" : "text-down"}`}>{pct(result.ret)}</p>
-      <p className="mt-2 text-center text-sub">
-        {result.marketRet !== null && <>The market did {pct(result.marketRet)}. </>}
-        It was <strong className="text-text">{monthLabel(result.reveal.from)} to {monthLabel(result.reveal.to)}</strong>
-        {result.reveal.during ? <>, during {result.reveal.during}</> : null}.{" "}
-        {result.guessed ? `You named the decade.` : `It was ${result.reveal.eraName.replace("The ", "the ")}, so your guess was off.`}
+      <p className="mt-3 text-center text-sm font-semibold text-sub">The time period was</p>
+      <p className="sign text-center text-3xl font-extrabold">
+        {monthLabel(result.reveal.from, true)} to {monthLabel(result.reveal.to, true)}
+      </p>
+      <p className="mt-1 text-center text-sub">
+        {result.reveal.during && <>That&apos;s during {result.reveal.during.name}. </>}
+        {result.marketRet !== null && <>The whole market did {pct(result.marketRet)}.</>}
       </p>
       {result.alreadyPlayed && <p className="mt-1 text-center text-xs text-dim">You&apos;d already played today, so your first score ({pct(result.ret)}) is the one that counts.</p>}
 
@@ -251,6 +236,8 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
         </Link>
       </div>
       {practice && <p className="mt-3 text-center text-[11px] text-dim">This was a practice run. Only your first score counts today.</p>}
+
+      <LearnLinks links={learnForWindow(result.reveal.from, result.reveal.to, result.reveal.during?.id ?? null)} heading="Learn what happened in these years" />
 
       <Countdown />
 

@@ -4,10 +4,10 @@ import { DAILY_TTL, dailyKey, saveScore, standing, validClient } from "@/lib/sco
 
 /**
  * Finish a Mystery Market: the server re-runs the trades on the real prices, saves the first score
- * of the day for this browser, and only then reveals the era and how you compare with everyone else.
+ * of the day for this browser, and only then reveals the time period and how you compare with everyone else.
  */
 export async function POST(request: Request) {
-  let body: { day?: string; clientId?: string; trades?: SubmittedTrade[]; guess?: string };
+  let body: { day?: string; clientId?: string; trades?: SubmittedTrade[] };
   try {
     body = await request.json();
   } catch {
@@ -48,7 +48,6 @@ export async function POST(request: Request) {
     thisRound: ret,
     alreadyPlayed: Math.abs(counted - ret) > 1e-9,
     marketRet: first ? last / first - 1 : null,
-    guessed: body.guess === built.reveal.eraId,
     reveal: built.reveal,
     standing: stand,
   });

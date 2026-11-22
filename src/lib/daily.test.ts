@@ -4,19 +4,17 @@ import { advance, buy, newGame, sell, short } from "./engine";
 import { monthsBetween } from "./eras";
 
 describe("daily mystery market", () => {
-  it("picks the same puzzle for the same day, anywhere from 1927, with a fair decade question", () => {
+  it("picks the same puzzle for the same day, from anywhere since 1927", () => {
     const a = pickPuzzle("2026-11-22");
     expect(pickPuzzle("2026-11-22")).toEqual(a);
     const days = Array.from({ length: 200 }, (_, i) => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10));
-    const decades = new Set(days.map((d) => pickPuzzle(d).decade));
+    const decades = new Set(days.map((d) => pickPuzzle(d).start.slice(0, 3)));
     expect(decades.size).toBeGreaterThan(7);
     for (const d of days) {
       const p = pickPuzzle(d);
       expect(p.start >= FIRST_START && p.start <= LAST_START).toBe(true);
       expect(monthsBetween(p.start, p.end)).toHaveLength(DAILY_MONTHS);
       expect(p.kind).toBe(p.start < STOCKS_FROM ? "industries" : "stocks");
-      expect(new Set(p.choices).size).toBe(4);
-      expect(p.choices).toContain(p.decade);
     }
   });
 
@@ -35,9 +33,7 @@ describe("daily mystery market", () => {
     expect(puzzle.companies.map((c) => c.ticker)).not.toContain(pick.pool[0].ticker); // late listings only fill gaps
     expect(Object.values(puzzle.prices).every((s) => s[0] === 100)).toBe(true);
     expect(JSON.stringify(puzzle)).not.toContain(pick.start);
-    expect(reveal.eraId).toBe(pick.decade);
     expect(reveal.from).toBe(pick.start);
-    expect(puzzle.choices.map((c) => c.id)).toEqual(pick.choices);
   });
 
   it("re-scores trades on the server and rejects impossible ones", () => {

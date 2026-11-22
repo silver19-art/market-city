@@ -3,7 +3,7 @@ import { ERAS } from "./eras";
 
 export interface Progress {
   eras: Record<string, { best: number; beat: boolean; plays: number }>;
-  daily: Record<string, { ret: number; guessed: boolean }>;
+  daily: Record<string, { ret: number; beat: boolean }>;
   flags: string[];
 }
 
@@ -44,7 +44,7 @@ export const BADGES: Badge[] = [
   { id: "short-seller", name: "Short seller", how: "Make money on a short", earned: (p) => p.flags.includes("short-win") },
   { id: "time-traveler", name: "Time traveler", how: `Finish all ${ERAS.length} eras`, earned: (p) => ERAS.every((e) => p.eras[e.id]) },
   { id: "market-master", name: "Market master", how: `Beat the market in all ${ERAS.length} eras`, earned: (p) => ERAS.every((e) => beat(p, e.id)) },
-  { id: "history-buff", name: "History buff", how: "Name the decade in a Mystery Market", earned: (p) => Object.values(p.daily).some((d) => d.guessed) },
+  { id: "mystery-winner", name: "Mystery winner", how: "Beat the market in a Mystery Market", earned: (p) => Object.values(p.daily).some((d) => d.beat) },
   { id: "regular", name: "Regular", how: "Play the Mystery Market on 3 different days", earned: (p) => Object.keys(p.daily).length >= 3 },
 ];
 
@@ -61,10 +61,10 @@ export function recordRound(eraId: string, ret: number, beatMarket: boolean, sho
   return earnedBadges(p).filter((b) => !before.has(b.id));
 }
 
-export function recordDaily(day: string, ret: number, guessed: boolean): Badge[] {
+export function recordDaily(day: string, ret: number, beat: boolean): Badge[] {
   const before = new Set(earnedBadges(loadProgress()).map((b) => b.id));
   const p = loadProgress();
-  if (!p.daily[day]) p.daily[day] = { ret, guessed };
+  if (!p.daily[day]) p.daily[day] = { ret, beat };
   save(p);
   return earnedBadges(p).filter((b) => !before.has(b.id));
 }

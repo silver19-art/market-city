@@ -156,3 +156,13 @@ describe("blurbs", () => {
     expect(blurbFor("ai", "GOOGL", "Alphabet (Google)")).toMatch(/^Google's parent company/);
   });
 });
+
+describe("learn links", () => {
+  it("every era has reading, and any window gets year pages", async () => {
+    const { LEARN, learnForWindow } = await import("./learn");
+    for (const e of ERAS) expect(LEARN[e.id]?.length, e.id).toBeGreaterThan(0);
+    const links = learnForWindow("1974-03", "1976-02", "stagflation");
+    expect(links[0].source).toBe("Federal Reserve History");
+    expect(links.slice(-3).map((l) => l.url.split("/").pop())).toEqual(["1974_in_the_United_States", "1975_in_the_United_States", "1976_in_the_United_States"]);
+  });
+});
