@@ -93,7 +93,7 @@ async function loadEra(id: string) {
   const missing = tickers.filter((t) => !results[t]);
   // Don't cache a mostly failed load: throwing skips the cache so the next request retries.
   const bench = market ?? results[BENCHMARK];
-  if (!bench || missing.length > tickers.length / 3) throw new Error(`price sources unavailable (${missing.length} missing)`);
+  if (!bench || missing.length > tickers.length / 3) throw new Error(`price sources unavailable (missing ${missing.join(", ")})`);
 
   const prices: Record<string, Series> = {};
   for (const c of era.companies) if (results[c.ticker]) prices[c.ticker] = compact(results[c.ticker]!);
@@ -106,7 +106,7 @@ export async function GET(request: Request) {
   try {
     const data = await loadEra(id);
     return Response.json(data, { headers: { "cache-control": "public, s-maxage=86400, stale-while-revalidate=604800" } });
-  } catch {
-    return Response.json({ error: "Couldn’t load prices right now. Try again in a minute." }, { status: 503 });
+  } catch (e) {
+    return Response.json({ error: "Couldn’t load prices right now. Try again in a minute.", detail: e instanceof Error ? e.message : String(e) }, { status: 503 });
   }
 }
