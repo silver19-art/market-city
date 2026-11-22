@@ -5,6 +5,13 @@ import { monthsBetween } from "./eras";
 import { FACTORS_FILE, INDUSTRIES_FILE, marketReturns, toIndex } from "./french";
 import type { Series } from "./history";
 import { french, fromYahoo } from "./load-era";
+import { simulateReturns } from "./simulate";
+
+const seedFor = (s: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+};
 
 /** The day's 24 months of data: industries or companies, plus the whole US market as the benchmark. */
 async function windowData(day: string) {
@@ -35,4 +42,12 @@ async function windowData(day: string) {
 /** The day's puzzle and answer key. */
 export async function puzzleFor(day: string) {
   return buildPuzzle(day, await windowData(day));
+}
+
+/** The day's simulated investors, trading the same 24 months. */
+export async function simulatedFor(day: string) {
+  "use cache";
+  cacheLife("max");
+  const { puzzle } = await puzzleFor(day);
+  return simulateReturns(puzzle.prices, puzzle.months.length, seedFor(`sim:${day}`));
 }

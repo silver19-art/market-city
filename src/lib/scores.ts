@@ -34,9 +34,10 @@ async function others(key: string, clientId: string) {
   return out;
 }
 
-export async function standing(key: string, clientId: string, you: number): Promise<Standing | null> {
+export async function standing(key: string, clientId: string, you: number, simulated?: number[]): Promise<Standing | null> {
   const rest = await others(key, clientId);
-  return rest ? standingFrom(you, rest) : null;
+  if (rest) return standingFrom(you, rest, simulated);
+  return simulated ? standingFrom(you, [], simulated) : null;
 }
 
 export async function storedScore(key: string, clientId: string) {

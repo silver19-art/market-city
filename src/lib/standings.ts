@@ -7,13 +7,20 @@ export interface Bin {
 }
 
 export interface Standing {
-  /** Share of other players you beat (0 to 1), or null if you're the only one so far. */
+  /** Share of the comparison group you beat (0 to 1), or null if there's nobody to compare with. */
   percentile: number | null;
-  /** Players counted, including you. */
+  /** Size of the comparison group, including you when it's real players. */
   total: number;
   bins: Bin[];
   you: number;
+  /** "players" compares with real people; "simulated" with labeled computer investors on the same prices. */
+  basis: "players" | "simulated";
+  /** Real people who have finished so far (besides you). */
+  realPlayers: number;
 }
+
+/** Below this many real players, rounds are compared with simulated investors instead. */
+export const MIN_REAL_PLAYERS = 20;
 
 /** Share of the other players whose return is below yours. Ties count as half. */
 export function percentileOf(you: number, others: number[]): number | null {
@@ -47,6 +54,8 @@ export function histogram(all: number[], you: number, count = 24): Bin[] {
 }
 
 /** Where `you` sits among everyone else's scores (others must not include this player). */
-export function standingFrom(you: number, others: number[]): Standing {
-  return { percentile: percentileOf(you, others), total: others.length + 1, bins: histogram([...others, you], you), you };
+export function standingFrom(you: number, others: number[], simulated?: number[]): Standing {
+  if (others.length < MIN_REAL_PLAYERS && simulated && simulated.length > 0)
+    return { percentile: percentileOf(you, simulated), total: simulated.length, bins: histogram(simulated, you), you, basis: "simulated", realPlayers: others.length };
+  return { percentile: percentileOf(you, others), total: others.length + 1, bins: histogram([...others, you], you), you, basis: "players", realPlayers: others.length };
 }

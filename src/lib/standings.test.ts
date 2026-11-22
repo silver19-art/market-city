@@ -8,6 +8,17 @@ describe("standings", () => {
     expect(percentileOf(0.1, [0.1, 0])).toBe(0.75);
   });
 
+  it("uses labeled simulated investors until enough real people have played", () => {
+    const sims = Array.from({ length: 100 }, (_, i) => i / 100 - 0.5);
+    const early = standingFrom(0.25, [0.1], sims);
+    expect(early.basis).toBe("simulated");
+    expect(early.realPlayers).toBe(1);
+    expect(early.percentile).toBeCloseTo(0.75, 1);
+    const later = standingFrom(0.25, Array.from({ length: 20 }, () => 0), sims);
+    expect(later.basis).toBe("players");
+    expect(later.percentile).toBe(1);
+  });
+
   it("counts you in the total", () => {
     const s = standingFrom(0.2, [0.1, 0.3, -0.1]);
     expect(s.total).toBe(4);

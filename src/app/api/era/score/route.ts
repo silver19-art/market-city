@@ -2,6 +2,18 @@ import { replayScore, type SubmittedTrade } from "@/lib/daily";
 import { eraById } from "@/lib/eras";
 import { loadEra } from "@/lib/load-era";
 import { eraKey, saveScore, standing, validClient } from "@/lib/scores";
+import { simulateReturns } from "@/lib/simulate";
+import { cacheLife } from "next/cache";
+
+/** Simulated investors for an era, computed once and cached (the prices never change). */
+async function simulatedForEra(id: string) {
+  "use cache";
+  cacheLife("max");
+  const data = await loadEra(id);
+  let seed = 7;
+  for (const ch of id) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+  return simulateReturns(data.prices, data.months.length, seed);
+}
 
 /**
  * Compare a finished era round with everyone who has played that era. The server replays the trades
@@ -27,7 +39,7 @@ export async function POST(request: Request) {
   const ret = Math.round(result.ret * 10000) / 10000;
   try {
     await saveScore(eraKey(era.id), body.clientId as string, ret, "best");
-    return Response.json({ ret, standing: await standing(eraKey(era.id), body.clientId as string, ret) });
+    return Response.json({ ret, standing: await standing(eraKey(era.id), body.clientId as string, ret, await simulatedForEra(era.id)) });
   } catch (e) {
     console.error("era score storage", e);
     return Response.json({ ret, standing: null });

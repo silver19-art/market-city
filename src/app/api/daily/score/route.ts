@@ -1,5 +1,5 @@
 import { isValidDay, replayScore, todayKey, type SubmittedTrade } from "@/lib/daily";
-import { puzzleFor } from "@/lib/daily-server";
+import { puzzleFor, simulatedFor } from "@/lib/daily-server";
 import { DAILY_TTL, dailyKey, saveScore, standing, validClient } from "@/lib/scores";
 
 /**
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   let stand = null;
   try {
     counted = (await saveScore(dailyKey(day), clientId, ret, "first", DAILY_TTL)) ?? ret;
-    stand = await standing(dailyKey(day), clientId, counted);
+    stand = await standing(dailyKey(day), clientId, counted, await simulatedFor(day));
   } catch (e) {
     console.error("daily score storage", e);
   }

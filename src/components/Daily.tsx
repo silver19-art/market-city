@@ -185,7 +185,8 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
   }, [result.day]);
 
   const share = async () => {
-    const better = stand?.percentile != null ? `, better than ${Math.round(stand.percentile * 100)}% of players` : "";
+    const better =
+      stand?.percentile != null ? `, better than ${Math.round(stand.percentile * 100)}% of ${stand.basis === "simulated" ? "simulated investors" : "players"}` : "";
     const text = `Market City Mystery Market ${result.day}: ${pct(result.ret)}${better}. Can you beat it? https://market-city-game.vercel.app/daily`;
     try {
       await navigator.clipboard.writeText(text);

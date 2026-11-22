@@ -1,7 +1,7 @@
 "use client";
 
 import { pct } from "@/lib/format";
-import type { Standing } from "@/lib/standings";
+import { MIN_REAL_PLAYERS, type Standing } from "@/lib/standings";
 import { useEffect, useState } from "react";
 
 const W = 640;
@@ -13,7 +13,9 @@ export function StandingView({ standing, audience }: { standing: Standing | null
   if (!standing)
     return <p className="mt-6 text-sm text-sub">Comparisons with other players aren&apos;t available right now. Your score is still saved on this device.</p>;
 
-  const { percentile, total, bins, you } = standing;
+  const { percentile, total, bins, you, basis, realPlayers } = standing;
+  const simulated = basis === "simulated";
+  const group = simulated ? `${total} simulated investors` : audience;
   const iw = W - PAD.l - PAD.r;
   const ih = H - PAD.t - PAD.b;
   const lo = bins[0]?.x0 ?? you - 0.1;
@@ -43,12 +45,12 @@ export function StandingView({ standing, audience }: { standing: Standing | null
           <>You&apos;re the first to finish. Check back as more people play.</>
         ) : (
           <>
-            Better than <strong className="num text-2xl font-extrabold text-glow">{Math.round(percentile * 100)}%</strong> of {audience}
+            Better than <strong className="num text-2xl font-extrabold text-glow">{Math.round(percentile * 100)}%</strong> of {group}
           </>
         )}
       </p>
       {bins.length > 0 && (
-        <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 h-auto w-full" role="img" aria-label={`Distribution of ${total} players' returns, with yours at ${pct(you)}`}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 h-auto w-full" role="img" aria-label={`Distribution of ${group}' returns, with yours at ${pct(you)}`}>
           <defs>
             <linearGradient id="dist-fill" x1="0" x2="0" y1="0" y2="1">
               <stop offset="0" stopColor="#3cc6a8" stopOpacity="0.45" />
@@ -70,9 +72,15 @@ export function StandingView({ standing, audience }: { standing: Standing | null
           </text>
         </svg>
       )}
-      <p className="text-center text-[11px] text-dim">
-        {total} {total === 1 ? "player" : "players"} so far. Returns, with yours at {pct(you)}.
-      </p>
+      {simulated ? (
+        <p className="mx-auto max-w-md text-center text-[11px] leading-relaxed text-dim">
+          Simulated, not real people: computer investors trading the same real prices with common habits (buy and hold, frequent trading, chasing trends, panic selling). You&apos;ll be compared with real players once {MIN_REAL_PLAYERS} have finished. Real players so far: {realPlayers + 1}.
+        </p>
+      ) : (
+        <p className="text-center text-[11px] text-dim">
+          {total} {total === 1 ? "player" : "players"} so far. Returns, with yours at {pct(you)}.
+        </p>
+      )}
     </div>
   );
 }
