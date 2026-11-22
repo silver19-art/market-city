@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildPuzzle, DAILY_MONTHS, FIRST_START, LAST_START, pickPuzzle, replayScore, STOCKS_FROM, todayKey } from "./daily";
 import { advance, buy, newGame, sell, short } from "./engine";
-import { monthsBetween } from "./eras";
+import { ERAS, monthsBetween } from "./eras";
 
 describe("daily mystery market", () => {
   it("picks the same puzzle for the same day, from anywhere since 1927", () => {
@@ -9,12 +9,13 @@ describe("daily mystery market", () => {
     expect(pickPuzzle("2026-11-22")).toEqual(a);
     const days = Array.from({ length: 200 }, (_, i) => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10));
     const decades = new Set(days.map((d) => pickPuzzle(d).start.slice(0, 3)));
-    expect(decades.size).toBeGreaterThan(7);
+    expect(decades.size).toBeGreaterThan(5);
     for (const d of days) {
       const p = pickPuzzle(d);
       expect(p.start >= FIRST_START && p.start <= LAST_START).toBe(true);
       expect(monthsBetween(p.start, p.end)).toHaveLength(DAILY_MONTHS);
       expect(p.kind).toBe(p.start < STOCKS_FROM ? "industries" : "stocks");
+      for (const e of ERAS.filter((x) => x.region !== "world")) expect(e.start <= p.end && e.end >= p.start, `${d} overlaps ${e.id}`).toBe(false);
     }
   });
 
@@ -30,8 +31,11 @@ describe("daily mystery market", () => {
     const { puzzle, reveal } = buildPuzzle("2026-11-22", { months, prices, market: months.map((_, m) => 50 + m) });
     expect(puzzle.months).toHaveLength(DAILY_MONTHS);
     expect(puzzle.companies.length).toBe(Math.min(16, pick.pool.length));
-    expect(puzzle.companies.map((c) => c.ticker)).not.toContain(pick.pool[0].ticker); // late listings only fill gaps
-    expect(Object.values(puzzle.prices).every((s) => s[0] === 100)).toBe(true);
+    // A company that lists later only fills a gap, so it comes after everything trading from month one.
+    const tickers = puzzle.companies.map((c) => c.ticker);
+    if (pick.pool.length > 16) expect(tickers).not.toContain(pick.pool[0].ticker);
+    else expect(tickers[tickers.length - 1]).toBe(pick.pool[0].ticker);
+    expect(Object.values(puzzle.prices).every((s) => s.find((v) => v != null) === 100)).toBe(true);
     expect(JSON.stringify(puzzle)).not.toContain(pick.start);
     expect(reveal.from).toBe(pick.start);
   });

@@ -1,6 +1,7 @@
 /**
  * The daily Mystery Market: everyone gets the same 24-month stretch of US market history each day,
- * picked from anywhere between 1927 and today. You see what you're trading, but the dates and news
+ * picked from anywhere between 1927 and today, but never overlapping one of the playable eras,
+ * so the daily game is always a part of history you can't play anywhere else. You see what you're trading, but the dates and news
  * are hidden until the end and prices are rebased to $100.
  * Before 1985 the towers are industries (free stock-by-stock data starts then); after, real companies.
  */
@@ -108,11 +109,20 @@ export interface PuzzlePick {
   pool: Company[];
 }
 
+/** Every start month whose 24-month window stays clear of the playable American eras. */
+export function openStarts(): string[] {
+  const eras = ERAS.filter((e) => e.region !== "world");
+  return monthsBetween(FIRST_START, LAST_START).filter((start) => {
+    const end = addMonths(start, DAILY_MONTHS - 1);
+    return !eras.some((e) => e.start <= end && e.end >= start);
+  });
+}
+
 /** Deterministic pick for a day. The same date always gives the same puzzle on every device and the server. */
 export function pickPuzzle(day: string): PuzzlePick {
-  const rand = rng(seedOf(`market-city:v2:${day}`));
-  const span = monthsBetween(FIRST_START, LAST_START).length;
-  const start = addMonths(FIRST_START, Math.floor(rand() * span));
+  const rand = rng(seedOf(`market-city:v3:${day}`));
+  const starts = openStarts();
+  const start = starts[Math.floor(rand() * starts.length)];
   const end = addMonths(start, DAILY_MONTHS - 1);
   const kind = start < STOCKS_FROM ? "industries" : "stocks";
   return { start, end, kind, pool: shuffle(kind === "industries" ? INDUSTRY_POOL : STOCK_POOL, rand) };
