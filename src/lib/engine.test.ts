@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advance, buy, maxDrawdown, newGame, portfolioValue, priceAt, report, sell, STARTING_CASH, TRADE_FEE, type Prices } from "./engine";
+import { advance, buy, maxDrawdown, newGame, portfolioValue, priceAt, report, sell, STARTING_CASH, TRADE_FEE, type Prices, short, cover } from "./engine";
 import { ERAS, monthsBetween } from "./eras";
 
 const prices: Prices = {
@@ -91,5 +91,48 @@ describe("report", () => {
     expect(rep.equalWeightReturn).toBeCloseTo(3, 6); // only AAA traded at the start: 10 → 40
     expect(rep.best?.ticker).toBe("AAA");
     expect(rep.trades).toBe(1);
+  });
+});
+
+describe("short selling", () => {
+  const prices = { AAA: [100, 50, 200, 400], BBB: [10, 10, 10, 10] };
+  it("profits when the price falls", () => {
+    let g = newGame();
+    const r = short(g, prices, "AAA", 2000);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    g = r.state;
+    expect(g.shares.AAA).toBeCloseTo(-20);
+    expect(portfolioValue(g, prices)).toBeCloseTo(10000 - 5);
+    g = advance(g, prices); // price halves
+    expect(portfolioValue(g, prices)).toBeCloseTo(10000 - 5 + 1000);
+    const c = cover(g, prices, "AAA", "all");
+    expect(c.ok).toBe(true);
+    if (c.ok) {
+      expect(c.state.shares.AAA).toBeUndefined();
+      expect(c.state.cash).toBeCloseTo(10000 - 5 + 1000 - 5);
+    }
+  });
+
+  it("blocks shorting beyond the account value and mixing long with short", () => {
+    const g = newGame();
+    const r = short(g, prices, "AAA", 50000);
+    expect(r.ok && -r.state.shares.AAA * 100).toBeCloseTo(10000);
+    const b = buy(g, prices, "BBB", 100);
+    expect(b.ok && short(b.state, prices, "BBB", 100).ok).toBe(false);
+    const s = short(g, prices, "BBB", 100);
+    expect(s.ok && buy(s.state, prices, "BBB", 100).ok).toBe(false);
+  });
+
+  it("force-covers shorts in a margin call when the account runs low", () => {
+    let g = newGame();
+    const r = short(g, prices, "AAA", 10000);
+    if (!r.ok) throw new Error(r.reason);
+    g = advance(r.state, prices); // 50: fine
+    expect(g.marginCalls).toEqual([]);
+    g = advance(g, prices); // 200: owes 20,000 against ~0 equity
+    expect(g.marginCalls).toEqual([2]);
+    expect(g.shares.AAA).toBeUndefined();
+    expect(g.trades.at(-1)?.forced).toBe(true);
   });
 });

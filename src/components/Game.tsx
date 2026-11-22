@@ -29,9 +29,9 @@ const SPEEDS = [
 ];
 
 const VIEWS: { id: CamMode; label: string; hint: string }[] = [
-  { id: "tour", label: "Tour", hint: "Circling the city. Drag, scroll or press W to take the controls." },
+  { id: "orbit", label: "Mouse", hint: "Drag to spin, right-drag to slide, scroll to zoom toward your cursor. W A S D slide too. V to walk." },
   { id: "fly", label: "Fly", hint: "W A S D to move, drag to look, Q and E to go down and up, scroll to dive, Shift for speed. V to walk." },
-  { id: "walk", label: "Walk", hint: "W A S D to walk the avenues, drag to look up at the towers, Shift to jog. V to fly." },
+  { id: "walk", label: "Walk", hint: "W A S D to walk the avenues, drag to look up at the towers, Shift to jog. V to go back." },
 ];
 
 function useHistory(eraId: string) {
@@ -92,7 +92,7 @@ function Board({ era, data }: { era: Era; data: History }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pauseOnNews, setPauseOnNews] = useState(true);
-  const [mode, setMode] = useState<CamMode>("tour");
+  const [mode, setMode] = useState<CamMode>("orbit");
 
   const eventsByMonth = useMemo(() => new Map(era.events.map((e) => [e.month, e.headline])), [era]);
   const headline = eventsByMonth.get(months[game.month]);
@@ -124,7 +124,7 @@ function Board({ era, data }: { era: Era; data: History }) {
         e.preventDefault();
         if (!done) setPlaying((p) => !p);
       } else if (e.code === "ArrowRight" && !playing && !done) step();
-      else if (e.code === "KeyV") setMode((m) => (m === "walk" ? "fly" : "walk"));
+      else if (e.code === "KeyV") setMode((m) => (m === "walk" ? "orbit" : "walk"));
       else if (e.code === "Escape") setSelected(null);
     };
     window.addEventListener("keydown", onKey);
@@ -136,10 +136,12 @@ function Board({ era, data }: { era: Era; data: History }) {
   const spy0 = spy.find((v) => v != null) ?? null;
   const spyNow = priceAt({ s: spy }, "s", game.month);
   const spyRet = spy0 && spyNow ? spyNow / spy0 - 1 : null;
-  const owned = useMemo(() => new Set(Object.keys(game.shares)), [game.shares]);
+  const owned = useMemo(() => new Set(Object.keys(game.shares).filter((t) => game.shares[t] > 0)), [game.shares]);
+  const shorted = useMemo(() => new Set(Object.keys(game.shares).filter((t) => game.shares[t] < 0)), [game.shares]);
+  const marginCalled = game.marginCalls.includes(game.month);
   const holdings = Object.entries(game.shares)
     .map(([t, n]) => ({ t, v: n * (priceAt(prices, t, game.month) ?? 0) }))
-    .sort((a, b) => b.v - a.v);
+    .sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
   const company = companies.find((c) => c.ticker === selected);
 
   const replay = () => {
@@ -152,7 +154,7 @@ function Board({ era, data }: { era: Era; data: History }) {
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden">
       <div className="absolute inset-0 z-0 isolate">
-        <City companies={companies} prices={prices} month={game.month} owned={owned} selected={selected} onSelect={setSelected} mode={mode} onMode={setMode} />
+        <City companies={companies} prices={prices} month={game.month} owned={owned} shorted={shorted} selected={selected} onSelect={setSelected} mode={mode} />
       </div>
 
       {/* Top bar */}
@@ -193,6 +195,13 @@ function Board({ era, data }: { era: Era; data: History }) {
         </div>
       )}
 
+      {marginCalled && (
+        <div className="panel slide-in absolute top-44 left-1/2 z-20 w-[min(560px,calc(100%-2rem))] -translate-x-1/2 border-down/50 px-5 py-3 text-center">
+          <p className="text-xs font-bold text-down">Margin call</p>
+          <p className="mt-0.5 text-sm">Your shorts rose so much that your account dropped below 30% of what you owed, so they were bought back for you at this month&apos;s prices.</p>
+        </div>
+      )}
+
       {/* Left: cash and holdings */}
       <aside className="panel absolute bottom-28 left-4 z-20 hidden w-64 p-4 md:block">
         <div className="flex items-baseline justify-between">
@@ -201,15 +210,16 @@ function Board({ era, data }: { era: Era; data: History }) {
         </div>
         <p className="mt-3 text-xs font-semibold text-sub">Holdings</p>
         {holdings.length === 0 ? (
-          <p className="mt-1 text-xs text-dim">Click any building to buy shares.</p>
+          <p className="mt-1 text-xs text-dim">Click any tower to buy or short it.</p>
         ) : (
           <ul className="mt-1 max-h-48 space-y-1 overflow-y-auto">
             {holdings.map((h) => (
               <li key={h.t}>
                 <button type="button" onClick={() => setSelected(h.t)} className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-sm hover:bg-white/5">
                   <span className="flex items-center gap-2 font-bold">
-                    <span className="size-2 rounded-full bg-own" />
+                    <span className={`size-2 rounded-full ${h.v < 0 ? "bg-down" : "bg-own"}`} />
                     {h.t}
+                    {h.v < 0 && <span className="text-[11px] font-semibold text-down">short</span>}
                   </span>
                   <span className="num">{usd(h.v)}</span>
                 </button>
@@ -234,7 +244,7 @@ function Board({ era, data }: { era: Era; data: History }) {
       {/* Right: selected stock */}
       {company && (
         <div className="absolute top-24 right-4 bottom-28 z-20 flex w-[min(360px,calc(100%-2rem))] items-start overflow-y-auto">
-          <StockPanel key={company.ticker} company={company} prices={prices} game={game} onTrade={setGame} onClose={() => setSelected(null)} />
+          <StockPanel key={company.ticker} company={company} prices={prices} months={months} events={era.events} spy={spy} game={game} onTrade={setGame} onClose={() => setSelected(null)} />
         </div>
       )}
 
@@ -317,7 +327,7 @@ function Board({ era, data }: { era: Era; data: History }) {
         </div>
       </footer>
 
-      {game.month === 0 && !playing && !selected && !done && mode === "tour" && (
+      {game.month === 0 && !playing && !selected && !done && (
         <div className="panel slide-in absolute top-44 left-4 z-30 lg:top-28 w-[min(400px,calc(100%-2rem))] p-6">
           <p className="num text-xs font-bold text-glow">{era.years}</p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight">{era.name}</h1>
@@ -328,7 +338,7 @@ function Board({ era, data }: { era: Era; data: History }) {
           <button type="button" onClick={() => setPlaying(true)} className="mt-5 rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110">
             Start the clock
           </button>
-          <p className="mt-3 text-[11px] text-dim">Space plays or pauses, the right arrow steps one month. Fly with W A S D and drag to look, or press V to walk the streets.</p>
+          <p className="mt-3 text-[11px] text-dim">Space plays or pauses, the right arrow steps one month. Drag to spin the city, right-drag to slide, scroll to zoom. Press V to walk the streets.</p>
         </div>
       )}
 

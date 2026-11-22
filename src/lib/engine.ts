@@ -9,7 +9,9 @@ export type Prices = Record<string, (number | null)[]>; // ticker → close per 
 export interface Trade {
   month: number;
   ticker: string;
-  side: "buy" | "sell";
+  side: "buy" | "sell" | "short" | "cover";
+  /** Set when the trade was forced by a margin call. */
+  forced?: boolean;
   shares: number;
   price: number;
   fee: number;
@@ -18,12 +20,20 @@ export interface Trade {
 export interface GameState {
   month: number;
   cash: number;
+  /** Positive for shares owned, negative for shares sold short. */
   shares: Record<string, number>;
   trades: Trade[];
   feesPaid: number;
   /** Portfolio value at the end of each month played so far. */
   valueHistory: number[];
+  /** Months in which shorts were force-covered because the account ran too low. */
+  marginCalls: number[];
 }
+
+/** You can short up to this multiple of your account value in total. */
+export const SHORT_LIMIT = 1;
+/** If account value falls below this share of what you owe on shorts, they are bought back for you. */
+export const MAINTENANCE = 0.3;
 
 export const newGame = (): GameState => ({
   month: 0,
@@ -32,6 +42,7 @@ export const newGame = (): GameState => ({
   trades: [],
   feesPaid: 0,
   valueHistory: [STARTING_CASH],
+  marginCalls: [],
 });
 
 export const priceAt = (prices: Prices, ticker: string, month: number): number | null => {
@@ -47,6 +58,13 @@ export function portfolioValue(state: GameState, prices: Prices, month = state.m
   return v;
 }
 
+/** Dollar value currently owed on all short positions. */
+export function shortLiability(state: GameState, prices: Prices, month = state.month): number {
+  let v = 0;
+  for (const [t, n] of Object.entries(state.shares)) if (n < 0) v += -n * (priceAt(prices, t, month) ?? 0);
+  return v;
+}
+
 export type TradeResult = { ok: true; state: GameState } | { ok: false; reason: string };
 
 /** Buy `dollars` worth (fractional shares allowed). The fee comes out of cash on top. */
@@ -54,6 +72,7 @@ export function buy(state: GameState, prices: Prices, ticker: string, dollars: n
   const p = priceAt(prices, ticker, state.month);
   if (!p) return { ok: false, reason: `${ticker} isn't trading yet` };
   if (dollars <= 0) return { ok: false, reason: "Enter an amount above $0" };
+  if ((state.shares[ticker] ?? 0) < 0) return { ok: false, reason: `You're short ${ticker}. Cover the short before buying.` };
   const spend = Math.min(dollars, state.cash - TRADE_FEE);
   if (spend <= 0) return { ok: false, reason: `Not enough cash (each trade costs $${TRADE_FEE})` };
   const shares = spend / p;
@@ -94,10 +113,70 @@ export function sell(state: GameState, prices: Prices, ticker: string, dollars: 
   };
 }
 
-/** Move to the next month and record the portfolio's value. */
+/**
+ * Sell borrowed shares now, hoping to buy them back cheaper. The sale adds cash, and the
+ * position shows as negative shares, so its value falls as the price rises.
+ */
+export function short(state: GameState, prices: Prices, ticker: string, dollars: number): TradeResult {
+  const p = priceAt(prices, ticker, state.month);
+  if (!p) return { ok: false, reason: `${ticker} isn't trading yet` };
+  if (dollars <= 0) return { ok: false, reason: "Enter an amount above $0" };
+  if ((state.shares[ticker] ?? 0) > 0) return { ok: false, reason: `You own ${ticker}. Sell it before shorting.` };
+  if (dollars <= TRADE_FEE) return { ok: false, reason: `Trade is smaller than the $${TRADE_FEE} fee` };
+  const room = SHORT_LIMIT * portfolioValue(state, prices) - shortLiability(state, prices);
+  if (room <= TRADE_FEE) return { ok: false, reason: "You've hit your shorting limit: total shorts can't exceed your account value." };
+  const amount = Math.min(dollars, room);
+  const shares = amount / p;
+  return {
+    ok: true,
+    state: {
+      ...state,
+      cash: state.cash + amount - TRADE_FEE,
+      shares: { ...state.shares, [ticker]: (state.shares[ticker] ?? 0) - shares },
+      trades: [...state.trades, { month: state.month, ticker, side: "short", shares, price: p, fee: TRADE_FEE }],
+      feesPaid: state.feesPaid + TRADE_FEE,
+    },
+  };
+}
+
+/** Buy back shorted shares: `dollars` worth, or the whole short when "all". */
+export function cover(state: GameState, prices: Prices, ticker: string, dollars: number | "all", forced = false): TradeResult {
+  const p = priceAt(prices, ticker, state.month);
+  const owed = -(state.shares[ticker] ?? 0);
+  if (!p || owed <= 0) return { ok: false, reason: `You aren't short ${ticker}` };
+  const shares = dollars === "all" ? owed : Math.min(owed, dollars / p);
+  if (shares <= 0) return { ok: false, reason: "Enter an amount above $0" };
+  const cost = shares * p;
+  if (!forced && cost + TRADE_FEE > state.cash) return { ok: false, reason: "Not enough cash to buy those shares back" };
+  const left = owed - shares;
+  const next = { ...state.shares };
+  if (left < 1e-9) delete next[ticker];
+  else next[ticker] = -left;
+  return {
+    ok: true,
+    state: {
+      ...state,
+      cash: state.cash - cost - TRADE_FEE,
+      shares: next,
+      trades: [...state.trades, { month: state.month, ticker, side: "cover", shares, price: p, fee: TRADE_FEE, forced: forced || undefined }],
+      feesPaid: state.feesPaid + TRADE_FEE,
+    },
+  };
+}
+
+/** Move to the next month, run any margin call, and record the portfolio's value. */
 export function advance(state: GameState, prices: Prices): GameState {
   const month = state.month + 1;
-  const next = { ...state, month };
+  let next: GameState = { ...state, month };
+  const owed = shortLiability(next, prices, month);
+  if (owed > 0 && portfolioValue(next, prices, month) < MAINTENANCE * owed) {
+    for (const [t, n] of Object.entries(next.shares)) {
+      if (n >= 0) continue;
+      const r = cover(next, prices, t, "all", true);
+      if (r.ok) next = r.state;
+    }
+    next = { ...next, marginCalls: [...next.marginCalls, month] };
+  }
   return { ...next, valueHistory: [...state.valueHistory, portfolioValue(next, prices, month)] };
 }
 
@@ -121,7 +200,9 @@ export interface Report {
   benchmarkDrawdown: number | null;
   trades: number;
   feesPaid: number;
-  cashShare: number; // share of the final portfolio sitting in cash
+  cashShare: number; // share of the final portfolio sitting in free cash (not counting short proceeds)
+  marginCalls: number;
+  shorted: boolean;
   best: { ticker: string; ret: number } | null;
   worst: { ticker: string; ret: number } | null;
   /** Return from splitting $10,000 evenly across every company trading at the start and holding. */
@@ -147,17 +228,19 @@ export function report(state: GameState, prices: Prices, benchmark: (number | nu
   const benchmarkReturn = b0 && bEnd ? bEnd / b0 - 1 : null;
   const bValues = benchmark.slice(0, last + 1).filter((x): x is number => x != null);
 
-  // Realized + unrealized return by ticker the player traded (money-weighted by dollars in vs out).
-  const flows: Record<string, { in: number; out: number }> = {};
+  // Realized + unrealized profit by ticker, over the capital put at risk (dollars bought plus dollars shorted).
+  const flows: Record<string, { in: number; out: number; capital: number }> = {};
   for (const t of state.trades) {
-    const f = (flows[t.ticker] ??= { in: 0, out: 0 });
-    if (t.side === "buy") f.in += t.shares * t.price;
-    else f.out += t.shares * t.price;
+    const f = (flows[t.ticker] ??= { in: 0, out: 0, capital: 0 });
+    const amt = t.shares * t.price;
+    if (t.side === "buy" || t.side === "cover") f.in += amt;
+    else f.out += amt;
+    if (t.side === "buy" || t.side === "short") f.capital += amt;
   }
   const perTicker = Object.entries(flows)
     .map(([ticker, f]) => {
       const held = (state.shares[ticker] ?? 0) * (priceAt(prices, ticker, last) ?? 0);
-      return { ticker, ret: f.in > 0 ? (f.out + held) / f.in - 1 : 0 };
+      return { ticker, ret: f.capital > 0 ? (f.out + held - f.in) / f.capital : 0 };
     })
     .sort((a, b) => b.ret - a.ret);
 
@@ -176,7 +259,9 @@ export function report(state: GameState, prices: Prices, benchmark: (number | nu
     benchmarkDrawdown: bValues.length ? maxDrawdown(bValues) : null,
     trades: state.trades.length,
     feesPaid: state.feesPaid,
-    cashShare: finalValue > 0 ? state.cash / finalValue : 0,
+    cashShare: finalValue > 0 ? Math.max(0, state.cash - shortLiability(state, prices, last)) / finalValue : 0,
+    marginCalls: state.marginCalls.length,
+    shorted: state.trades.some((t) => t.side === "short"),
     best: perTicker[0] ?? null,
     worst: perTicker.length > 1 ? perTicker[perTicker.length - 1] : null,
     equalWeightReturn: rv.length ? rv.reduce((a, b) => a + b, 0) / rv.length : null,

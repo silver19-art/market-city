@@ -118,6 +118,7 @@ export function Tower({
   change,
   listed,
   owned,
+  shorted,
   selected,
   onSelect,
   seed,
@@ -127,6 +128,7 @@ export function Tower({
   change: number;
   listed: boolean;
   owned: boolean;
+  shorted: boolean;
   selected: boolean;
   onSelect: (t: string) => void;
   seed: number;
@@ -202,10 +204,10 @@ export function Tower({
 
       <group ref={top}>{listed && <Crown style={lot.style} color={color} glow={1.7} />}</group>
 
-      {owned && listed && (
+      {(owned || shorted) && listed && (
         <mesh ref={beam}>
           <cylinderGeometry args={[2.2, 0.25, 60, 24, 1, true]} />
-          <meshBasicMaterial color="#ffd36b" transparent opacity={0.13} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} fog={false} />
+          <meshBasicMaterial color={shorted ? "#ff6b57" : "#ffd36b"} transparent opacity={0.13} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} fog={false} />
         </mesh>
       )}
 
@@ -221,10 +223,11 @@ export function Tower({
           <div
             ref={tag}
             className={`rounded px-1.5 transition-opacity duration-300 py-0.5 text-[12px] font-bold whitespace-nowrap [font-stretch:85%] ${
-              selected ? "bg-glow text-night" : owned ? "bg-night/80 text-own ring-1 ring-own/60" : "bg-night/70 text-text"
+              selected ? "bg-glow text-night" : owned ? "bg-night/80 text-own ring-1 ring-own/60" : shorted ? "bg-night/80 text-down ring-1 ring-down/60" : "bg-night/70 text-text"
             }`}
           >
             {lot.ticker}
+            {shorted && <span className="ml-1 font-medium">short</span>}
             {!listed && <span className="ml-1 font-medium text-sub">not public yet</span>}
           </div>
         </Html>

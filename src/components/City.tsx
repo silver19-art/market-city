@@ -39,13 +39,13 @@ export interface CityProps {
   prices: Prices;
   month: number;
   owned: Set<string>;
+  shorted: Set<string>;
   selected: string | null;
   onSelect: (t: string | null) => void;
   mode: CamMode;
-  onMode: (m: CamMode) => void;
 }
 
-export default function City({ companies, prices, month, owned, selected, onSelect, mode, onMode }: CityProps) {
+export default function City({ companies, prices, month, owned, shorted, selected, onSelect, mode }: CityProps) {
   const plan = useMemo(() => planStocks(companies), [companies]);
   const bases = useMemo(() => {
     const out: Record<string, number | null> = {};
@@ -90,13 +90,14 @@ export default function City({ companies, prices, month, owned, selected, onSele
             change={p && prev ? p / prev - 1 : 0}
             listed={p != null}
             owned={owned.has(l.ticker)}
+            shorted={shorted.has(l.ticker)}
             selected={selected === l.ticker}
             onSelect={onSelect}
           />
         );
       })}
 
-      <CameraRig mode={mode} onMode={onMode} focus={focus} centerZ={plan.center} />
+      <CameraRig mode={mode} focus={focus} centerZ={plan.center} />
     </Canvas>
   );
 }

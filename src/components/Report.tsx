@@ -36,6 +36,8 @@ export function Report({ era, game, prices, spy, months, onReplay }: { era: Era;
   if (r.cashShare > 0.4) lessons.push(`${pct(r.cashShare, 0, false)} of your money ended the round in cash. Cash is safe in a crash, but it misses the rebounds that usually follow.`);
   if (r.benchmarkReturn !== null && r.totalReturn > r.benchmarkReturn) lessons.push("Beating the market once can be luck. Over long periods, most stock pickers trail the index, which is why many investors simply buy it.");
   if (r.maxDrawdown > 0.4) lessons.push(`At your worst point you were down ${pct(r.maxDrawdown, 0, false)} from your peak. Ask yourself honestly whether you would have held on with real money.`);
+  if (r.marginCalls > 0) lessons.push(`You were margin-called ${r.marginCalls === 1 ? "once" : `${r.marginCalls} times`}. A short can lose more than you put in, because a stock can keep rising, and brokers force you out at the worst moment.`);
+  else if (r.shorted) lessons.push("You shorted stocks this round. Shorting pays when prices fall, but markets rise more often than they fall, so short sellers are fighting the long-run trend.");
   lessons.push("Survivorship bias: this city only has companies still trading today, because that's the only free data. Companies that went under, like Enron, WorldCom and Lehman Brothers, aren't here, so real investors faced worse odds than this game.");
 
   return (
