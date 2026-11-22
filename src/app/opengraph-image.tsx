@@ -78,7 +78,7 @@ export default async function Image() {
             Invest $10,000 through the 1929 crash, World War II, 2008, COVID and the AI boom. Fly through the city as prices rise and crash. Can you beat the market?
           </div>
           <div style={{ display: "flex", marginTop: 34, gap: 12 }}>
-            {["8 real eras", "Buy or short", "Free to play"].map((t) => (
+            {["11 real eras", "Buy or short", "Free to play"].map((t) => (
               <div key={t} style={{ display: "flex", padding: "8px 16px", borderRadius: 999, border: "1px solid rgba(186,200,255,0.22)", fontSize: 20, color: "#eef1fa" }}>
                 {t}
               </div>

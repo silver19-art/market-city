@@ -1,5 +1,6 @@
-import { ERAS } from "@/lib/eras";
+import { ERAS, type Era } from "@/lib/eras";
 import { DailyCard, EraProgress, ProgressPanel } from "@/components/Progress";
+import { shortLabel } from "@/lib/currency";
 import Link from "next/link";
 
 /** A Manhattan skyline at night with a suspension bridge, drawn from a fixed seed so it never changes. */
@@ -120,6 +121,37 @@ function Skyline() {
   );
 }
 
+function EraGrid({ eras }: { eras: Era[] }) {
+  return (
+    <ul className="mt-5 grid gap-4 sm:grid-cols-2">
+        {eras.map((e) => (
+          <li key={e.id}>
+            <Link href={`/play/${e.id}`} className="panel group flex h-full flex-col p-6 transition-colors hover:border-glow/50">
+              <span className="num text-xs font-bold text-glow">
+                {e.years}
+                {e.country && <span className="font-semibold text-sub"> in {e.country}</span>}
+              </span>
+              <span className="sign mt-1 text-3xl font-extrabold">{e.name}</span>
+              <span className="mt-2 text-sub">{e.pitch}</span>
+              {e.source === "industries" && <span className="mt-2 text-xs text-dim">Before stock-by-stock records, so each tower is a whole industry.</span>}
+              {e.region === "world" && <span className="mt-2 text-xs text-dim">Prices converted to US dollars, so currency swings count.</span>}
+              <EraProgress id={e.id} />
+              <span className="mt-4 flex flex-wrap gap-1.5">
+                {e.companies.slice(0, 7).map((c) => (
+                  <span key={c.ticker} className="rounded-md bg-white/5 px-2 py-0.5 text-[11px] font-bold text-sub">
+                    {shortLabel(c.ticker, c.name)}
+                  </span>
+                ))}
+                <span className="rounded-md px-1 py-0.5 text-[11px] text-dim">+{e.companies.length - 7} more</span>
+              </span>
+              <span className="mt-5 text-sm font-bold text-glow group-hover:underline">Play this era</span>
+            </Link>
+          </li>
+        ))}
+    </ul>
+  );
+}
+
 export default function Home() {
   return (
     <main className="mx-auto max-w-6xl px-5 pt-14 pb-20">
@@ -138,29 +170,12 @@ export default function Home() {
       <DailyCard />
       <ProgressPanel />
 
-      <h2 className="mt-14 text-xl font-extrabold tracking-tight">Choose an era, from 1928 to today</h2>
-      <ul className="mt-5 grid gap-4 sm:grid-cols-2">
-        {ERAS.map((e) => (
-          <li key={e.id}>
-            <Link href={`/play/${e.id}`} className="panel group flex h-full flex-col p-6 transition-colors hover:border-glow/50">
-              <span className="num text-xs font-bold text-glow">{e.years}</span>
-              <span className="sign mt-1 text-3xl font-extrabold">{e.name}</span>
-              <span className="mt-2 text-sub">{e.pitch}</span>
-              {e.source === "industries" && <span className="mt-2 text-xs text-dim">Before stock-by-stock records, so each tower is a whole industry.</span>}
-              <EraProgress id={e.id} />
-              <span className="mt-4 flex flex-wrap gap-1.5">
-                {e.companies.slice(0, 7).map((c) => (
-                  <span key={c.ticker} className="rounded-md bg-white/5 px-2 py-0.5 text-[11px] font-bold text-sub">
-                    {c.ticker}
-                  </span>
-                ))}
-                <span className="rounded-md px-1 py-0.5 text-[11px] text-dim">+{e.companies.length - 7} more</span>
-              </span>
-              <span className="mt-5 text-sm font-bold text-glow group-hover:underline">Play this era</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <h2 className="mt-14 text-xl font-extrabold tracking-tight">American markets, from 1928 to today</h2>
+      <EraGrid eras={ERAS.filter((e) => e.region !== "world")} />
+
+      <h2 className="mt-14 text-xl font-extrabold tracking-tight">Around the world</h2>
+      <p className="mt-1 text-sm text-sub">Trade Europe, Japan and China as an American investor would: every price is in dollars.</p>
+      <EraGrid eras={ERAS.filter((e) => e.region === "world")} />
 
       <section className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[

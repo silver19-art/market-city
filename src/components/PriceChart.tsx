@@ -47,6 +47,7 @@ export function PriceChart({
   height = 150,
   big = false,
   marketLabel = "S&P 500",
+  label,
   isIndex = false,
 }: {
   ticker: string;
@@ -59,6 +60,7 @@ export function PriceChart({
   height?: number;
   big?: boolean;
   marketLabel?: string;
+  label?: string;
   isIndex?: boolean;
 }) {
   const [wrap, width] = useWidth<HTMLDivElement>();
@@ -190,7 +192,7 @@ export function PriceChart({
           )}
           {compare && mkt[h] != null && pts[h] != null && (
             <p className="num text-sub">
-              {marketLabel} {pct(mkt[h]! / 100 - 1, 0)}, {ticker} {pct(pts[h]! / 100 - 1, 0)}
+              {marketLabel} {pct(mkt[h]! / 100 - 1, 0)}, {label ?? ticker} {pct(pts[h]! / 100 - 1, 0)}
             </p>
           )}
           {hTrades.map((t, k) => (
@@ -208,7 +210,7 @@ export function PriceChart({
             <>
               <span className="flex items-center gap-1.5">
                 <span className="h-0.5 w-3 rounded" style={{ background: STOCK }} />
-                {ticker}
+                {label ?? ticker}
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="h-0.5 w-3 rounded" style={{ background: MARKET }} />

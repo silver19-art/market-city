@@ -42,9 +42,9 @@ export const BADGES: Badge[] = [
   { id: "crash-survivor", name: "Crash survivor", how: "Beat the market in the Great Crash", earned: (p) => beat(p, "crash1929") },
   { id: "bubble-dodger", name: "Bubble dodger", how: "Beat the market in the dot-com bubble", earned: (p) => beat(p, "dotcom") },
   { id: "short-seller", name: "Short seller", how: "Make money on a short", earned: (p) => p.flags.includes("short-win") },
-  { id: "time-traveler", name: "Time traveler", how: "Finish all 8 eras", earned: (p) => ERAS.every((e) => p.eras[e.id]) },
-  { id: "market-master", name: "Market master", how: "Beat the market in all 8 eras", earned: (p) => ERAS.every((e) => beat(p, e.id)) },
-  { id: "history-buff", name: "History buff", how: "Name the era in a Mystery Market", earned: (p) => Object.values(p.daily).some((d) => d.guessed) },
+  { id: "time-traveler", name: "Time traveler", how: `Finish all ${ERAS.length} eras`, earned: (p) => ERAS.every((e) => p.eras[e.id]) },
+  { id: "market-master", name: "Market master", how: `Beat the market in all ${ERAS.length} eras`, earned: (p) => ERAS.every((e) => beat(p, e.id)) },
+  { id: "history-buff", name: "History buff", how: "Name the decade in a Mystery Market", earned: (p) => Object.values(p.daily).some((d) => d.guessed) },
   { id: "regular", name: "Regular", how: "Play the Mystery Market on 3 different days", earned: (p) => Object.keys(p.daily).length >= 3 },
 ];
 

@@ -39,7 +39,7 @@ export function DailyCard() {
         <p className="text-xs font-bold text-glow">New every day</p>
         <p className="sign mt-1 text-3xl font-extrabold">Mystery Market</p>
         <p className="mt-2 text-sub">
-          A real two-year stretch of history with the dates and news hidden. Trade the companies, beat the market, guess the era, and see how you rank against everyone who played today.
+          A real two-year stretch from any time since 1927, with the dates and news hidden. Beat the market, guess the decade, and see how you rank against everyone who played today.
         </p>
       </div>
       <span className="rounded-xl bg-glow px-5 py-3 text-sm font-extrabold text-night group-hover:brightness-110">

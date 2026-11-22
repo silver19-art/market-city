@@ -13,7 +13,7 @@ describe("eras", () => {
     expect(monthsBetween("1999-11", "2000-02")).toEqual(["1999-11", "1999-12", "2000-01", "2000-02"]);
   });
   it("every era is well formed", () => {
-    expect(ERAS.length).toBe(8);
+    expect(ERAS.length).toBe(11);
     const FF30 = "Food Beer Smoke Games Books Hshld Clths Hlth Chems Txtls Cnstr Steel FabPr ElcEq Autos Carry Mines Coal Oil Util Telcm Servs BusEq Paper Trans Whlsl Rtail Meals Fin Other".split(" ");
     for (const e of ERAS) {
       const months = monthsBetween(e.start, e.end);

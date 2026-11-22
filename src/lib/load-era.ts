@@ -1,5 +1,6 @@
 import "server-only";
-import { BENCHMARK, eraById, monthsBetween } from "@/lib/eras";
+import { benchmarkTicker, eraById, monthsBetween } from "@/lib/eras";
+import { currencyOf, fxSymbol, toUsd, type Currency } from "@/lib/currency";
 import { FACTORS_FILE, FRENCH_BASE, INDUSTRIES_FILE, marketReturns, parseFrenchMonthly, toIndex } from "@/lib/french";
 import { compact, parseStooqCsv, parseYahooChart, type Series } from "@/lib/history";
 import { unzipSync, strFromU8 } from "fflate";
@@ -7,7 +8,7 @@ import { cacheLife } from "next/cache";
 
 const UA = "Mozilla/5.0 (compatible; MarketCity/1.0)";
 
-async function fromYahoo(ticker: string, months: string[]): Promise<Series | null> {
+export async function fromYahoo(ticker: string, months: string[]): Promise<Series | null> {
   const [y1, m1] = months[0].split("-").map(Number);
   const [y2, m2] = months[months.length - 1].split("-").map(Number);
   const p1 = Date.UTC(y1, m1 - 1, 1) / 1000 - 86400 * 3;
@@ -48,7 +49,7 @@ async function series(ticker: string, months: string[]) {
 }
 
 /** Download one zipped CSV from the French data library and parse its monthly table. */
-async function french(file: string) {
+export async function french(file: string) {
   const res = await fetch(FRENCH_BASE + file, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(20_000), cache: "no-store" });
   if (!res.ok) throw new Error(`French data ${res.status}`);
   const files = unzipSync(new Uint8Array(await res.arrayBuffer()));
@@ -85,7 +86,8 @@ async function fetchEra(id: string) {
     return { era: era.id, months, prices, spy: compact(market!), missing };
   }
 
-  const tickers = [...era.companies.map((c) => c.ticker), ...(market ? [] : [BENCHMARK])];
+  const benchTicker = benchmarkTicker(era);
+  const tickers = [...era.companies.map((c) => c.ticker), ...(benchTicker ? [benchTicker] : [])];
 
   const results: Record<string, Series | null> = {};
   // A few at a time, to be polite to the free sources.
@@ -97,7 +99,17 @@ async function fetchEra(id: string) {
 
   const missing = tickers.filter((t) => !results[t]);
   // Don't cache a mostly failed load: throwing skips the cache so the next request retries.
-  const bench = market ?? results[BENCHMARK];
+  // Foreign prices are converted to dollars month by month, so the player sees what an American investor got.
+  const foreign = [...new Set(tickers.map(currencyOf))].filter((c): c is Exclude<Currency, "USD"> => c !== "USD");
+  const rates = Object.fromEntries(await Promise.all(foreign.map(async (c) => [c, await fromYahoo(fxSymbol(c).symbol, months)] as const)));
+  for (const t of tickers) {
+    const c = currencyOf(t);
+    if (c === "USD" || !results[t]) continue;
+    const fx = rates[c];
+    results[t] = fx ? toUsd(results[t]!, fx, fxSymbol(c).usdPerUnit) : null;
+    if (!fx && !missing.includes(t)) missing.push(t);
+  }
+  const bench = market ?? (benchTicker ? results[benchTicker] : null);
   if (!bench || missing.length > tickers.length / 3) throw new Error(`price sources unavailable (missing ${missing.join(", ")})`);
 
   const prices: Record<string, Series> = {};

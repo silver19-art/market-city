@@ -1,14 +1,18 @@
 /**
- * The daily Mystery Market: everyone gets the same 24-month stretch of history each day.
- * You see which companies you're trading, but the dates and news are hidden and prices are
- * rebased to $100, so you have to work out when it is from how the market behaves.
+ * The daily Mystery Market: everyone gets the same 24-month stretch of US market history each day,
+ * picked from anywhere between 1927 and today. You see what you're trading, but the dates and news
+ * are hidden and prices are rebased to $100, so you have to work out when it is.
+ * Before 1985 the towers are industries (free stock-by-stock data starts then); after, real companies.
  */
 import { advance, buy, cover, newGame, portfolioValue, sell, short, STARTING_CASH, type GameState, type Prices, type Trade } from "./engine";
-import { ERAS, eraById, monthsBetween, type Company, type Sector } from "./eras";
+import { ERAS, monthsBetween, type Company, type Sector } from "./eras";
 import { rng } from "./cityplan";
 
 export const DAILY_MONTHS = 24;
 export const DAILY_TZ = "America/New_York";
+export const FIRST_START = "1927-01";
+export const LAST_START = "2024-01";
+export const STOCKS_FROM = "1985-01";
 
 /** Today's puzzle date (YYYY-MM-DD), switching at midnight New York time. */
 export function todayKey(now = new Date()) {
@@ -34,29 +38,97 @@ function shuffle<T>(list: T[], rand: () => number) {
   return out;
 }
 
+/** Sixteen broad industries with monthly returns back to 1926. */
+export const INDUSTRY_POOL: Company[] = [
+  { ticker: "Autos", name: "Automakers", sector: "Industrial" },
+  { ticker: "Steel", name: "Steel", sector: "Industrial" },
+  { ticker: "Carry", name: "Aircraft, ships and rail cars", sector: "Industrial" },
+  { ticker: "ElcEq", name: "Electrical equipment", sector: "Industrial" },
+  { ticker: "Chems", name: "Chemicals", sector: "Industrial" },
+  { ticker: "Oil", name: "Oil", sector: "Energy" },
+  { ticker: "Util", name: "Utilities", sector: "Energy" },
+  { ticker: "Mines", name: "Mining", sector: "Energy" },
+  { ticker: "Telcm", name: "Telephone and media", sector: "Tech" },
+  { ticker: "BusEq", name: "Business machines and computers", sector: "Tech" },
+  { ticker: "Fin", name: "Banks and finance", sector: "Finance" },
+  { ticker: "Trans", name: "Railroads, airlines and transport", sector: "Travel" },
+  { ticker: "Rtail", name: "Retail stores", sector: "Consumer" },
+  { ticker: "Food", name: "Food", sector: "Consumer" },
+  { ticker: "Smoke", name: "Tobacco", sector: "Consumer" },
+  { ticker: "Hlth", name: "Health care", sector: "Health" },
+];
+
+/** Long-lived US companies with free monthly history from 1985 (later listings join when they go public). */
+export const STOCK_POOL: Company[] = [
+  { ticker: "AAPL", name: "Apple", sector: "Tech" },
+  { ticker: "MSFT", name: "Microsoft", sector: "Tech" },
+  { ticker: "INTC", name: "Intel", sector: "Tech" },
+  { ticker: "IBM", name: "IBM", sector: "Tech" },
+  { ticker: "ORCL", name: "Oracle", sector: "Tech" },
+  { ticker: "CSCO", name: "Cisco", sector: "Tech" },
+  { ticker: "AMZN", name: "Amazon", sector: "Tech" },
+  { ticker: "NVDA", name: "Nvidia", sector: "Tech" },
+  { ticker: "GOOGL", name: "Alphabet (Google)", sector: "Tech" },
+  { ticker: "JPM", name: "JPMorgan", sector: "Finance" },
+  { ticker: "BAC", name: "Bank of America", sector: "Finance" },
+  { ticker: "C", name: "Citigroup", sector: "Finance" },
+  { ticker: "WFC", name: "Wells Fargo", sector: "Finance" },
+  { ticker: "AXP", name: "American Express", sector: "Finance" },
+  { ticker: "XOM", name: "Exxon Mobil", sector: "Energy" },
+  { ticker: "CVX", name: "Chevron", sector: "Energy" },
+  { ticker: "SLB", name: "Schlumberger", sector: "Energy" },
+  { ticker: "KO", name: "Coca-Cola", sector: "Consumer" },
+  { ticker: "PEP", name: "PepsiCo", sector: "Consumer" },
+  { ticker: "MCD", name: "McDonald's", sector: "Consumer" },
+  { ticker: "WMT", name: "Walmart", sector: "Consumer" },
+  { ticker: "HD", name: "Home Depot", sector: "Consumer" },
+  { ticker: "DIS", name: "Disney", sector: "Consumer" },
+  { ticker: "PG", name: "Procter & Gamble", sector: "Consumer" },
+  { ticker: "GE", name: "General Electric", sector: "Industrial" },
+  { ticker: "BA", name: "Boeing", sector: "Industrial" },
+  { ticker: "F", name: "Ford", sector: "Industrial" },
+  { ticker: "CAT", name: "Caterpillar", sector: "Industrial" },
+  { ticker: "MRK", name: "Merck", sector: "Health" },
+  { ticker: "JNJ", name: "Johnson & Johnson", sector: "Health" },
+  { ticker: "PFE", name: "Pfizer", sector: "Health" },
+  { ticker: "DAL", name: "Delta Air Lines", sector: "Travel" },
+];
+
+const DECADES = Array.from({ length: 11 }, (_, i) => 1920 + i * 10);
+export const decadeId = (year: number) => `${Math.floor(year / 10) * 10}s`;
+export const decadeName = (id: string) => `The ${id}`;
+
+function addMonths(ym: string, n: number) {
+  const [y, m] = ym.split("-").map(Number);
+  const t = y * 12 + (m - 1) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
+}
+
 export interface PuzzlePick {
-  eraId: string;
-  /** Index of the first month within the era. */
-  offset: number;
-  /** Era companies in a shuffled order for the day. */
-  order: Company[];
-  /** Four era ids for the "which era was it?" question, one of them correct. */
+  start: string;
+  end: string;
+  kind: "industries" | "stocks";
+  /** The decade the middle of the window falls in, e.g. "1970s". */
+  decade: string;
+  /** Four decades to choose from, one of them correct. */
   choices: string[];
+  /** Shuffled candidates; the server keeps up to 16 that are trading at the start. */
+  pool: Company[];
 }
 
 /** Deterministic pick for a day. The same date always gives the same puzzle on every device and the server. */
 export function pickPuzzle(day: string): PuzzlePick {
-  const rand = rng(seedOf(`market-city:${day}`));
-  const era = ERAS[Math.floor(rand() * ERAS.length)];
-  const total = monthsBetween(era.start, era.end).length;
-  const offset = Math.floor(rand() * (total - DAILY_MONTHS + 1));
-  const order = shuffle(era.companies, rand);
+  const rand = rng(seedOf(`market-city:v2:${day}`));
+  const span = monthsBetween(FIRST_START, LAST_START).length;
+  const start = addMonths(FIRST_START, Math.floor(rand() * span));
+  const end = addMonths(start, DAILY_MONTHS - 1);
+  const kind = start < STOCKS_FROM ? "industries" : "stocks";
+  const decade = decadeId(Number(addMonths(start, DAILY_MONTHS / 2).slice(0, 4)));
   const others = shuffle(
-    ERAS.filter((e) => e.id !== era.id),
+    DECADES.map((d) => `${d}s`).filter((d) => d !== decade),
     rand,
   ).slice(0, 3);
-  const choices = shuffle([era.id, ...others.map((e) => e.id)], rand);
-  return { eraId: era.id, offset, order, choices };
+  return { start, end, kind, decade, choices: shuffle([decade, ...others], rand), pool: shuffle(kind === "industries" ? INDUSTRY_POOL : STOCK_POOL, rand) };
 }
 
 export const mysteryMonths = () => Array.from({ length: DAILY_MONTHS }, (_, i) => `M-${String(i + 1).padStart(2, "0")}`);
@@ -68,6 +140,7 @@ export interface Puzzle {
   spy: (number | null)[];
   companies: { ticker: string; name: string; sector: Sector }[];
   choices: { id: string; name: string; years: string }[];
+  source: "industries" | "stocks";
 }
 
 export interface Reveal {
@@ -75,6 +148,8 @@ export interface Reveal {
   eraName: string;
   from: string;
   to: string;
+  /** A named era from the main game that this stretch overlaps, if any. */
+  during: string | null;
   key: { label: string; ticker: string; name: string }[];
 }
 
@@ -84,35 +159,37 @@ function rebase(s: (number | null)[]) {
   return s.map((v) => (v == null || !first ? null : Math.round((v / first) * 100 * 10000) / 10000));
 }
 
-/** Build the anonymized puzzle (sent to players) and the answer key (kept on the server until they finish). */
-export function buildPuzzle(day: string, era: { months: string[]; prices: Prices; spy: (number | null)[] }): { puzzle: Puzzle; reveal: Reveal } {
+/**
+ * Build the puzzle (sent to players) and the answer (kept on the server until they finish) from
+ * window data: prices for the pick's candidates over its 24 months, plus the whole market.
+ */
+export function buildPuzzle(day: string, window: { months: string[]; prices: Prices; market: (number | null)[] }): { puzzle: Puzzle; reveal: Reveal } {
   const pick = pickPuzzle(day);
-  const info = eraById(pick.eraId)!;
-  const slice = (s: (number | null)[]) => s.slice(pick.offset, pick.offset + DAILY_MONTHS);
+  // Prefer companies trading from the first month; fill up with later listings if needed.
+  const trading = pick.pool.filter((c) => window.prices[c.ticker]?.[0] != null);
+  const later = pick.pool.filter((c) => window.prices[c.ticker]?.[0] == null && window.prices[c.ticker]?.some((v) => v != null));
+  const chosen = [...trading, ...later].slice(0, 16);
   const prices: Prices = {};
-  const companies: Puzzle["companies"] = [];
-  const key: Reveal["key"] = [];
-  pick.order
-    .filter((c) => era.prices[c.ticker] && slice(era.prices[c.ticker]).some((v) => v != null))
-    .forEach((c) => {
-      prices[c.ticker] = rebase(slice(era.prices[c.ticker]));
-      companies.push({ ticker: c.ticker, name: c.name, sector: c.sector });
-      key.push({ label: c.ticker, ticker: c.ticker, name: c.name });
-    });
-  const window = era.months.slice(pick.offset, pick.offset + DAILY_MONTHS);
+  for (const c of chosen) prices[c.ticker] = rebase(window.prices[c.ticker]);
+  const during = ERAS.find((e) => e.region !== "world" && e.start <= pick.end && e.end >= pick.start)?.name ?? null;
   return {
     puzzle: {
       day,
       months: mysteryMonths(),
       prices,
-      spy: rebase(slice(era.spy)),
-      companies,
-      choices: pick.choices.map((id) => {
-        const e = eraById(id)!;
-        return { id, name: e.name, years: e.years };
-      }),
+      spy: rebase(window.market),
+      companies: chosen.map((c) => ({ ticker: c.ticker, name: c.name, sector: c.sector })),
+      choices: pick.choices.map((id) => ({ id, name: decadeName(id), years: `${id.slice(0, 4)}–${Number(id.slice(0, 4)) + 9}` })),
+      source: pick.kind,
     },
-    reveal: { eraId: info.id, eraName: info.name, from: window[0], to: window[window.length - 1], key },
+    reveal: {
+      eraId: pick.decade,
+      eraName: decadeName(pick.decade),
+      from: pick.start,
+      to: pick.end,
+      during,
+      key: chosen.map((c) => ({ label: c.ticker, ticker: c.ticker, name: c.name })),
+    },
   };
 }
 

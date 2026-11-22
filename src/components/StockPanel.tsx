@@ -3,6 +3,7 @@
 import { buy, cover, portfolioValue, priceAt, sell, short, shortLiability, SHORT_LIMIT, type GameState, type Prices, type TradeResult } from "@/lib/engine";
 import { benchmarkName, type Company, type Era } from "@/lib/eras";
 import { blurbFor } from "@/lib/about";
+import { shortLabel } from "@/lib/currency";
 import { level, monthLabel, pct, usd } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -70,7 +71,7 @@ export function StockPanel({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold text-sub">
-            {company.ticker}, {company.sector}
+            {shortLabel(company.ticker, company.name)}, {company.sector}
           </p>
           <h2 className="text-xl font-extrabold">{company.name}</h2>
           {blurbFor(era.id, company.ticker, company.name) && <p className="mt-1.5 text-sm leading-snug text-sub">{blurbFor(era.id, company.ticker, company.name)}</p>}
@@ -90,7 +91,7 @@ export function StockPanel({
           </div>
           {now && first && <p className="num text-xs text-sub">{pct(now / first - 1, 0)} since the era began{isIndex ? ". Industry index, dividends included, started at 100" : ""}</p>}
           <div className="mt-3">
-            <PriceChart ticker={company.ticker} series={series} months={months} month={game.month} trades={game.trades} events={events} isIndex={isIndex} />
+            <PriceChart ticker={company.ticker} label={shortLabel(company.ticker, company.name)} series={series} months={months} month={game.month} trades={game.trades} events={events} isIndex={isIndex} />
           </div>
           <button type="button" onClick={() => setExpanded(true)} className="mt-1 text-xs font-bold text-glow hover:underline">
             Open full chart
@@ -273,14 +274,14 @@ function ChartModal({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold text-sub">
-              {company.ticker}, monthly {isIndex ? "index levels" : "closes"} through {monthLabel(months[month], true)}
+              {shortLabel(company.ticker, company.name)}, monthly {isIndex ? "index levels" : "closes"} through {monthLabel(months[month], true)}
             </p>
             <h2 className="text-2xl font-extrabold">{company.name}</h2>
           </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-1.5 text-xs text-sub">
               <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="accent-[var(--color-glow)]" />
-              Compare with the {benchmarkName(era).toLowerCase() === "s&p 500" ? "S&P 500" : "whole stock market"}
+              Compare with {era.benchmark === "MARKET" ? "the whole stock market" : `the ${benchmarkName(era)}`}
             </label>
             <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-sub hover:bg-white/5 hover:text-text" aria-label="Close chart">
               ✕
@@ -296,7 +297,7 @@ function ChartModal({
           ))}
         </dl>
         <div className="mt-4">
-          <PriceChart ticker={company.ticker} series={series} months={months} month={month} trades={game.trades} events={events} spy={compare ? spy : undefined} height={340} big marketLabel={benchmarkName(era)} isIndex={isIndex} />
+          <PriceChart ticker={company.ticker} label={shortLabel(company.ticker, company.name)} series={series} months={months} month={month} trades={game.trades} events={events} spy={compare ? spy : undefined} height={340} big marketLabel={benchmarkName(era)} isIndex={isIndex} />
         </div>
         <p className="mt-3 text-xs text-dim">Dashed lines mark the news. The shaded area is the part of the era still to come. Prices are adjusted for splits and dividends.</p>
       </div>

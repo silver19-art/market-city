@@ -29,13 +29,19 @@ export interface Era {
   /** "industries": each building is a Fama-French industry portfolio (for years before stock-by-stock data exists). */
   source?: "stocks" | "industries";
   /** What you're trying to beat. SPY only exists from 1993; earlier eras use the whole US market with dividends. */
-  benchmark?: "SPY" | "MARKET";
+  benchmark?: "SPY" | "MARKET" | { ticker: string; name: string; long: string };
+  /** World eras get their own section and are priced in US dollars. */
+  region?: "us" | "world";
+  country?: string;
 }
 
 export const BENCHMARK = "SPY";
 
-export const benchmarkName = (era: Era) => (era.benchmark === "MARKET" ? "Stock market" : "S&P 500");
-export const benchmarkLong = (era: Era) => (era.benchmark === "MARKET" ? "Whole US stock market, dividends included" : "S&P 500 (SPY), buy and hold");
+export const benchmarkName = (era: Era) => (typeof era.benchmark === "object" ? era.benchmark.name : era.benchmark === "MARKET" ? "Stock market" : "S&P 500");
+export const benchmarkLong = (era: Era) =>
+  typeof era.benchmark === "object" ? era.benchmark.long : era.benchmark === "MARKET" ? "Whole US stock market, dividends included" : "S&P 500 (SPY), buy and hold";
+/** The Yahoo ticker to benchmark against, or null when the era uses the French market data. */
+export const benchmarkTicker = (era: Era) => (typeof era.benchmark === "object" ? era.benchmark.ticker : era.benchmark === "MARKET" ? null : BENCHMARK);
 export const unitName = (era: Era) => (era.source === "industries" ? "industry" : "company");
 
 export const ERAS: Era[] = [
@@ -360,6 +366,140 @@ export const ERAS: Era[] = [
       { month: "2024-06", headline: "Nvidia briefly becomes the world's most valuable company" },
       { month: "2025-01", headline: "China's DeepSeek releases a low-cost AI model, setting off a tech sell-off" },
       { month: "2025-04", headline: "Sweeping new tariffs send stocks tumbling" },
+    ],
+  },
+
+  {
+    id: "eurocrisis",
+    name: "The Euro Crisis",
+    years: "2010–2012",
+    start: "2010-01",
+    end: "2012-12",
+    region: "world",
+    country: "Europe",
+    pitch: "Greece can't pay its debts. Is the euro about to break apart?",
+    lesson:
+      "European stocks hit their lows in late 2011 and mid-2012. Once the European Central Bank promised to do whatever it took to save the euro, bank stocks rallied hard. Even so, bank shareholders lost heavily over the whole crisis, while global brands like LVMH and SAP held up far better.",
+    benchmark: { ticker: "FEZ", name: "Euro Stoxx 50", long: "Euro Stoxx 50 fund (FEZ), in dollars" },
+    companies: [
+      { ticker: "DBK.DE", name: "Deutsche Bank", sector: "Finance" },
+      { ticker: "BNP.PA", name: "BNP Paribas", sector: "Finance" },
+      { ticker: "SAN.MC", name: "Santander", sector: "Finance" },
+      { ticker: "UCG.MI", name: "UniCredit", sector: "Finance" },
+      { ticker: "ISP.MI", name: "Intesa Sanpaolo", sector: "Finance" },
+      { ticker: "CS.PA", name: "AXA", sector: "Finance" },
+      { ticker: "SIE.DE", name: "Siemens", sector: "Industrial" },
+      { ticker: "AIR.PA", name: "Airbus", sector: "Industrial" },
+      { ticker: "VOW3.DE", name: "Volkswagen", sector: "Industrial" },
+      { ticker: "BMW.DE", name: "BMW", sector: "Industrial" },
+      { ticker: "SAP.DE", name: "SAP", sector: "Tech" },
+      { ticker: "ASML.AS", name: "ASML", sector: "Tech" },
+      { ticker: "TEF.MC", name: "Telefónica", sector: "Tech" },
+      { ticker: "TTE.PA", name: "Total", sector: "Energy" },
+      { ticker: "ENI.MI", name: "Eni", sector: "Energy" },
+      { ticker: "IBE.MC", name: "Iberdrola", sector: "Energy" },
+      { ticker: "MC.PA", name: "LVMH", sector: "Consumer" },
+      { ticker: "ITX.MC", name: "Inditex (Zara)", sector: "Consumer" },
+    ],
+    events: [
+      { month: "2010-04", headline: "Greece asks for a bailout, and its debt is cut to junk" },
+      { month: "2010-05", headline: "Europe and the IMF agree a €110 billion Greek rescue and a €750 billion safety fund" },
+      { month: "2010-11", headline: "Ireland needs a bailout after propping up its banks" },
+      { month: "2011-05", headline: "Portugal becomes the third country to be bailed out" },
+      { month: "2011-08", headline: "Italy's and Spain's borrowing costs soar, and the US loses its AAA credit rating" },
+      { month: "2011-11", headline: "The prime ministers of Greece and Italy resign under market pressure" },
+      { month: "2011-12", headline: "The European Central Bank offers banks cheap three-year loans" },
+      { month: "2012-03", headline: "Greece completes the biggest government debt write-down in history" },
+      { month: "2012-06", headline: "Spain asks for up to €100 billion to rescue its banks" },
+      { month: "2012-07", headline: "ECB chief Mario Draghi promises to do 'whatever it takes' to save the euro" },
+      { month: "2012-09", headline: "The ECB announces it will buy struggling countries' bonds without limit" },
+    ],
+  },
+  {
+    id: "abenomics",
+    name: "Abenomics",
+    years: "2012–2015",
+    start: "2012-07",
+    end: "2015-12",
+    region: "world",
+    country: "Japan",
+    pitch: "Japan prints money to end 20 years of falling prices. Who wins?",
+    lesson:
+      "The Nikkei more than doubled as the yen fell, boosting exporters like Toyota. But this game is in US dollars, and the yen lost about a third of its value against the dollar, so an American investor kept much less of those gains. Currency moves are part of the return when you invest abroad.",
+    benchmark: { ticker: "EWJ", name: "Japan stocks", long: "Japan stock fund (EWJ), in dollars" },
+    companies: [
+      { ticker: "7203.T", name: "Toyota", sector: "Industrial" },
+      { ticker: "7267.T", name: "Honda", sector: "Industrial" },
+      { ticker: "7201.T", name: "Nissan", sector: "Industrial" },
+      { ticker: "6954.T", name: "Fanuc", sector: "Industrial" },
+      { ticker: "8058.T", name: "Mitsubishi Corp", sector: "Industrial" },
+      { ticker: "6758.T", name: "Sony", sector: "Tech" },
+      { ticker: "6752.T", name: "Panasonic", sector: "Tech" },
+      { ticker: "7974.T", name: "Nintendo", sector: "Tech" },
+      { ticker: "6501.T", name: "Hitachi", sector: "Tech" },
+      { ticker: "6861.T", name: "Keyence", sector: "Tech" },
+      { ticker: "9984.T", name: "SoftBank", sector: "Tech" },
+      { ticker: "9432.T", name: "NTT", sector: "Tech" },
+      { ticker: "8306.T", name: "Mitsubishi UFJ", sector: "Finance" },
+      { ticker: "8316.T", name: "Sumitomo Mitsui", sector: "Finance" },
+      { ticker: "9983.T", name: "Fast Retailing (Uniqlo)", sector: "Consumer" },
+      { ticker: "4911.T", name: "Shiseido", sector: "Consumer" },
+      { ticker: "4502.T", name: "Takeda", sector: "Health" },
+      { ticker: "9501.T", name: "Tokyo Electric Power", sector: "Energy" },
+    ],
+    events: [
+      { month: "2012-11", headline: "Japan's prime minister calls an election, and the yen starts to slide" },
+      { month: "2012-12", headline: "Shinzo Abe wins in a landslide, promising bold stimulus" },
+      { month: "2013-04", headline: "The Bank of Japan launches massive money printing to end deflation" },
+      { month: "2013-05", headline: "The Nikkei falls 7% in a single day after a huge run-up" },
+      { month: "2013-09", headline: "Tokyo wins the 2020 Olympics" },
+      { month: "2014-04", headline: "Japan raises its sales tax from 5% to 8%" },
+      { month: "2014-10", headline: "The Bank of Japan surprises with even more money printing, and the national pension fund moves into stocks" },
+      { month: "2015-04", headline: "The Nikkei tops 20,000 for the first time in 15 years" },
+      { month: "2015-08", headline: "China devalues its currency, rattling markets around the world" },
+    ],
+  },
+  {
+    id: "china2015",
+    name: "China's Stock Bubble",
+    years: "2014–2016",
+    start: "2014-01",
+    end: "2016-06",
+    region: "world",
+    country: "China",
+    pitch: "Millions of new investors pile into Shanghai stocks with borrowed money.",
+    lesson:
+      "Shanghai stocks more than doubled in a year, much of it on borrowed money, then lost over 40% in about two and a half months despite the government suspending trading and ordering big investors not to sell. Bubbles fed by borrowing tend to burst hard.",
+    benchmark: { ticker: "ASHR", name: "China A-shares", long: "China A-shares fund (ASHR), in dollars" },
+    companies: [
+      { ticker: "601398.SS", name: "ICBC", sector: "Finance" },
+      { ticker: "601988.SS", name: "Bank of China", sector: "Finance" },
+      { ticker: "600036.SS", name: "China Merchants Bank", sector: "Finance" },
+      { ticker: "601318.SS", name: "Ping An Insurance", sector: "Finance" },
+      { ticker: "601628.SS", name: "China Life", sector: "Finance" },
+      { ticker: "600030.SS", name: "CITIC Securities", sector: "Finance" },
+      { ticker: "600519.SS", name: "Kweichow Moutai", sector: "Consumer" },
+      { ticker: "000858.SZ", name: "Wuliangye", sector: "Consumer" },
+      { ticker: "000333.SZ", name: "Midea", sector: "Consumer" },
+      { ticker: "002594.SZ", name: "BYD", sector: "Industrial" },
+      { ticker: "601668.SS", name: "China State Construction", sector: "Industrial" },
+      { ticker: "000002.SZ", name: "Vanke", sector: "Industrial" },
+      { ticker: "601857.SS", name: "PetroChina", sector: "Energy" },
+      { ticker: "600028.SS", name: "Sinopec", sector: "Energy" },
+      { ticker: "0700.HK", name: "Tencent", sector: "Tech" },
+      { ticker: "BIDU", name: "Baidu", sector: "Tech" },
+      { ticker: "BABA", name: "Alibaba", sector: "Tech" },
+      { ticker: "000725.SZ", name: "BOE Technology", sector: "Tech" },
+    ],
+    events: [
+      { month: "2014-09", headline: "Alibaba lists in New York in the biggest IPO ever" },
+      { month: "2014-11", headline: "China cuts interest rates and opens a trading link between Shanghai and Hong Kong" },
+      { month: "2015-04", headline: "A record number of new trading accounts open as Shanghai stocks double in a year" },
+      { month: "2015-06", headline: "Shanghai stocks peak above 5,100 and then start to crash" },
+      { month: "2015-07", headline: "Beijing halts trading in about half of listed companies and bans big holders from selling" },
+      { month: "2015-08", headline: "China devalues the yuan and global markets tumble" },
+      { month: "2016-01", headline: "New circuit breakers halt the whole market twice in one week, then are scrapped" },
+      { month: "2016-06", headline: "Britain votes to leave the European Union" },
     ],
   },
 ];

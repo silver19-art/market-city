@@ -1,6 +1,7 @@
 "use client";
 
 import { advance, newGame, portfolioValue, priceAt, STARTING_CASH, type GameState, type Prices } from "@/lib/engine";
+import { shortLabel } from "@/lib/currency";
 import { benchmarkName, eraById, unitName, type Era } from "@/lib/eras";
 import { monthLabel, pct, usd } from "@/lib/format";
 import dynamic from "next/dynamic";
@@ -226,7 +227,7 @@ export function Board({ era, data, renderEnd }: { era: Era; data: History; rende
                 <button type="button" onClick={() => setSelected(h.t)} className="flex w-full items-center justify-between rounded-lg px-2 py-1 text-sm hover:bg-white/5">
                   <span className="flex items-center gap-2 font-bold">
                     <span className={`size-2 rounded-full ${h.v < 0 ? "bg-down" : "bg-own"}`} />
-                    {h.t}
+                    {shortLabel(h.t, era.companies.find((c) => c.ticker === h.t)?.name ?? h.t)}
                     {h.v < 0 && <span className="text-[11px] font-semibold text-down">short</span>}
                   </span>
                   <span className="num">{usd(h.v)}</span>

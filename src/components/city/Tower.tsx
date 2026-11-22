@@ -5,6 +5,7 @@ import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { Lot, TowerStyle } from "@/lib/cityplan";
+import { shortLabel } from "@/lib/currency";
 import { sharedWallBox } from "./geometry";
 import { tiled } from "./textures";
 
@@ -226,7 +227,7 @@ export function Tower({
               selected ? "bg-glow text-night" : owned ? "bg-night/80 text-own ring-1 ring-own/60" : shorted ? "bg-night/80 text-down ring-1 ring-down/60" : "bg-night/70 text-text"
             }`}
           >
-            {lot.ticker}
+            {shortLabel(lot.ticker, lot.name)}
             {shorted && <span className="ml-1 font-medium">short</span>}
             {!listed && <span className="ml-1 font-medium text-sub">not public yet</span>}
           </div>

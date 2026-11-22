@@ -1,6 +1,7 @@
 "use client";
 
 import { priceAt, report, type GameState, type Prices } from "@/lib/engine";
+import { shortLabel } from "@/lib/currency";
 import { benchmarkLong, benchmarkName, unitName, type Era } from "@/lib/eras";
 import { monthLabel, pct, usd } from "@/lib/format";
 import Link from "next/link";
@@ -91,7 +92,8 @@ export function Report({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   const r = report(game, prices, spy, era.companies.map((c) => c.ticker));
-  const bench = benchmarkName(era) === "S&P 500" ? "S&P 500" : "stock market";
+  const bench = era.benchmark === "MARKET" ? "stock market" : benchmarkName(era);
+  const nameOf = (t: string) => shortLabel(t, era.companies.find((c) => c.ticker === t)?.name ?? t);
   const [newBadges] = useState(() => {
     if (!recorded.has(game)) recorded.set(game, recordRound(era.id, r.totalReturn, r.benchmarkReturn !== null && r.totalReturn > r.benchmarkReturn, shortProfit(game, prices)));
     return recorded.get(game)!;
@@ -154,12 +156,12 @@ export function Report({
           <p className="mt-4 text-sm text-sub">
             {r.best && (
               <>
-                {r.worst ? "Best pick" : "Your only pick"}: <strong className={r.best.ret >= 0 ? "text-up" : "text-down"}>{r.best.ticker}</strong> ({pct(r.best.ret, 0)}).{" "}
+                {r.worst ? "Best pick" : "Your only pick"}: <strong className={r.best.ret >= 0 ? "text-up" : "text-down"}>{nameOf(r.best.ticker)}</strong> ({pct(r.best.ret, 0)}).{" "}
               </>
             )}
             {r.worst && (
               <>
-                Worst pick: <strong className="text-down">{r.worst.ticker}</strong> ({pct(r.worst.ret, 0)}).
+                Worst pick: <strong className="text-down">{nameOf(r.worst.ticker)}</strong> ({pct(r.worst.ret, 0)}).
               </>
             )}
           </p>

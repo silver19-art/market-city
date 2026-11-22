@@ -65,9 +65,13 @@ export function Daily() {
         years: "Year unknown",
         start: "",
         end: "",
-        pitch: "A real two-year stretch of market history. You know the companies, but the dates and news are hidden and every stock starts at $100. Can you tell when it is?",
+        pitch:
+          puzzle.source === "industries"
+            ? "A real two-year stretch of US market history from before 1985, so the towers are whole industries. The dates and news are hidden and everything starts at $100. Can you tell when it is?"
+            : "A real two-year stretch of US market history since 1985. You know the companies, but the dates and news are hidden and every stock starts at $100. Can you tell when it is?",
         lesson: "",
         companies: puzzle.companies,
+        source: puzzle.source,
         events: [],
         benchmark: "MARKET",
       },
@@ -154,7 +158,7 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
       </h2>
       {endedEarly && <p className="mt-1 text-sm text-sub">You ended early, so your positions are held to Month {puzzle.months.length} for scoring.</p>}
 
-      <h3 className="mt-6 text-sm font-bold text-glow">Which era do you think this was?</h3>
+      <h3 className="mt-6 text-sm font-bold text-glow">Which decade do you think this was?</h3>
       <div className="mt-2 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Your guess">
         {puzzle.choices.map((c) => (
           <button
@@ -199,7 +203,7 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
 
   const share = async () => {
     const better = stand?.percentile != null ? `, better than ${Math.round(stand.percentile * 100)}% of players` : "";
-    const text = `Market City Mystery Market ${result.day}: ${pct(result.ret)}${better}${result.guessed ? ", and I named the era" : ""}. Can you beat it? https://market-city-game.vercel.app/daily`;
+    const text = `Market City Mystery Market ${result.day}: ${pct(result.ret)}${better}${result.guessed ? ", and I named the decade" : ""}. Can you beat it? https://market-city-game.vercel.app/daily`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -214,8 +218,9 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
       <p className={`num mt-1 text-center text-6xl font-extrabold ${result.ret >= 0 ? "text-up" : "text-down"}`}>{pct(result.ret)}</p>
       <p className="mt-2 text-center text-sub">
         {result.marketRet !== null && <>The market did {pct(result.marketRet)}. </>}
-        It was <strong className="text-text">{result.reveal.eraName}</strong>, {monthLabel(result.reveal.from)} to {monthLabel(result.reveal.to)}.{" "}
-        {result.guessed ? "You named the era." : "Your era guess was off this time."}
+        It was <strong className="text-text">{monthLabel(result.reveal.from)} to {monthLabel(result.reveal.to)}</strong>
+        {result.reveal.during ? <>, during {result.reveal.during}</> : null}.{" "}
+        {result.guessed ? `You named the decade.` : `It was ${result.reveal.eraName.replace("The ", "the ")}, so your guess was off.`}
       </p>
       {result.alreadyPlayed && <p className="mt-1 text-center text-xs text-dim">You&apos;d already played today, so your first score ({pct(result.ret)}) is the one that counts.</p>}
 
