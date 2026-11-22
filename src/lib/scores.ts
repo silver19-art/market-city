@@ -8,7 +8,8 @@ const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TO
 const redis = url && token ? new Redis({ url, token }) : null;
 
 const DAILY_KEEP = 60 * 60 * 24 * 10;
-export const dailyKey = (day: string) => `daily:${day}:scores`;
+// Versioned with the puzzle picker, so a change to how puzzles are chosen starts a fresh comparison.
+export const dailyKey = (day: string) => `daily:v3:${day}:scores`;
 export const eraKey = (era: string) => `era:${era}:best`;
 
 /**
