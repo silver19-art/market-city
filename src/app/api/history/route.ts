@@ -106,26 +106,13 @@ async function fetchEra(id: string) {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const probe = url.searchParams.get("probe");
-  if (probe) {
-    // Which month does each ticker's free history start in? Used to choose era line-ups.
-    const months = monthsBetween(url.searchParams.get("from") ?? "1970-01", url.searchParams.get("to") ?? "1990-12");
-    const tickers = probe.split(",").slice(0, 40);
-    const out: Record<string, string | null> = {};
-    for (let i = 0; i < tickers.length; i += 6) {
-      const batch = tickers.slice(i, i + 6);
-      const got = await Promise.all(batch.map((t) => fromYahoo(t, months)));
-      batch.forEach((t, j) => (out[t] = got[j] ? months[got[j]!.findIndex((v) => v != null)] : null));
-    }
-    return Response.json(out);
-  }
   const id = url.searchParams.get("era") ?? "";
   if (!eraById(id)) return Response.json({ error: "Unknown era" }, { status: 404 });
   try {
-    // ?fresh=1 skips the cache, which also lets a failure explain itself.
-    const data = url.searchParams.has("fresh") ? await fetchEra(id) : await loadEra(id);
+    const data = await loadEra(id);
     return Response.json(data, { headers: { "cache-control": "public, s-maxage=86400, stale-while-revalidate=604800" } });
   } catch (e) {
-    return Response.json({ error: "Couldn’t load prices right now. Try again in a minute.", detail: e instanceof Error ? e.message : String(e) }, { status: 503 });
+    console.error("history", id, e);
+    return Response.json({ error: "Couldn’t load prices right now. Try again in a minute." }, { status: 503 });
   }
 }
