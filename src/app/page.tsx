@@ -1,6 +1,7 @@
 import { ERAS, type Era } from "@/lib/eras";
 import { DailyCard, EraProgress, ProgressPanel } from "@/components/Progress";
 import { shortLabel } from "@/lib/currency";
+import { Logo } from "@/components/Logo";
 import Link from "next/link";
 
 /** A Manhattan skyline at night with a suspension bridge, drawn from a fixed seed so it never changes. */
@@ -155,7 +156,7 @@ function EraGrid({ eras }: { eras: Era[] }) {
 export default function Home() {
   return (
     <main className="mx-auto max-w-6xl px-5 pt-14 pb-20">
-      <p className="sign text-lg font-extrabold text-glow">Market City</p>
+      <Logo size={56} />
       <h1 className="mt-4 max-w-4xl text-[clamp(2.8rem,7vw,5.6rem)] leading-[0.95] font-extrabold">
         Every building is a real stock. Every month is real history.
       </h1>

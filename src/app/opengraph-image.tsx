@@ -7,6 +7,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 const font = (f: string) => readFile(join(process.cwd(), "assets", f));
+const icon = () => readFile(join(process.cwd(), "src", "app", "icon.svg"));
 
 /** Deterministic skyline so the card looks the same every time it's generated. */
 function skyline() {
@@ -28,7 +29,8 @@ function skyline() {
 }
 
 export default async function Image() {
-  const [regular, heavy] = await Promise.all([font("Archivo-Regular.woff"), font("Archivo-ExtraBold.woff")]);
+  const [regular, heavy, mark] = await Promise.all([font("Archivo-Regular.woff"), font("Archivo-ExtraBold.woff"), icon()]);
+  const markSrc = `data:image/svg+xml;base64,${mark.toString("base64")}`;
   const towers = skyline();
   const ground = 560;
   const lit = towers.reduce((a, t, i) => (t.h > towers[a].h && i > 2 ? i : a), 3);
@@ -72,7 +74,10 @@ export default async function Image() {
         <div style={{ position: "absolute", left: 0, top: 0, width: 760, height: 630, display: "flex", background: "linear-gradient(90deg, rgba(5,8,20,0.96) 0%, rgba(5,8,20,0.85) 62%, rgba(5,8,20,0) 100%)" }} />
 
         <div style={{ position: "relative", display: "flex", flexDirection: "column", padding: "64px 72px", width: 700 }}>
-          <div style={{ display: "flex", fontSize: 30, fontWeight: 800, color: "#ffb547" }}>Market City</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <img src={markSrc} width={64} height={64} alt="" />
+            <div style={{ display: "flex", fontSize: 36, fontWeight: 800, color: "#eef1fa" }}>Market City</div>
+          </div>
           <div style={{ display: "flex", marginTop: 22, fontSize: 70, lineHeight: 1.02, fontWeight: 800, letterSpacing: -2 }}>Every building is a real stock.</div>
           <div style={{ display: "flex", marginTop: 24, fontSize: 28, lineHeight: 1.35, color: "#9ba6c4" }}>
             Invest $10,000 through the 1929 crash, World War II, 2008, COVID and the AI boom. Fly through the city as prices rise and crash. Can you beat the market?

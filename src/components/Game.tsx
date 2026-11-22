@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CamMode } from "./city/CameraRig";
+import { LogoMark } from "./Logo";
 import { Report } from "./Report";
 import { StockPanel } from "./StockPanel";
 
@@ -169,8 +170,9 @@ export function Board({ era, data, renderEnd }: { era: Era; data: History; rende
       {/* Top bar */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-wrap items-start justify-between gap-3 p-4">
         <div className="panel pointer-events-auto flex items-center gap-4 px-4 py-3">
-          <Link href="/" className="text-sm font-extrabold tracking-tight hover:text-glow" aria-label="Back to eras">
-            ← Market City
+          <Link href="/" className="flex items-center gap-2 text-sm font-extrabold tracking-tight hover:text-glow" aria-label="Back to Market City home">
+            <LogoMark size={26} />
+            <span className="sign text-base">Market City</span>
           </Link>
           <div className="h-8 w-px bg-edge" />
           <div>
