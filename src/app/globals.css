@@ -1,26 +1,66 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Dusk over the city: deep indigo sky, warm window light, teal for gains, coral for losses. */
+@theme {
+  --color-night: #0f0d24;
+  --color-dusk: #1b1640;
+  --color-panel: rgb(22 19 52 / 0.78);
+  --color-panel-solid: #191538;
+  --color-edge: rgb(255 255 255 / 0.09);
+  --color-edge-strong: rgb(255 255 255 / 0.16);
+  --color-text: #f1eefc;
+  --color-sub: #a9a3cc;
+  --color-dim: #726c99;
+  --color-up: #2fb8a6;
+  --color-down: #f2705a;
+  --color-glow: #ffc566;
+  --color-own: #ffd36b;
+  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-night);
+  color: var(--color-text);
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sky {
+  background:
+    radial-gradient(1200px 600px at 70% 110%, rgb(255 153 102 / 0.28), transparent 60%),
+    linear-gradient(180deg, #0c0a1f 0%, #1b1640 55%, #3a2552 100%);
+}
+
+.panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-edge);
+  border-radius: 18px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 20px 50px -24px rgb(0 0 0 / 0.7);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-glow);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .slide-in {
+    animation: slide-in 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
 }
