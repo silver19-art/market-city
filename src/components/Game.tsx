@@ -6,6 +6,7 @@ import { monthLabel, pct, usd } from "@/lib/format";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CamMode } from "./city/CameraRig";
 import { Report } from "./Report";
 import { StockPanel } from "./StockPanel";
 
@@ -25,6 +26,12 @@ const SPEEDS = [
   { label: "1×", ms: 1500 },
   { label: "2×", ms: 750 },
   { label: "4×", ms: 375 },
+];
+
+const VIEWS: { id: CamMode; label: string; hint: string }[] = [
+  { id: "tour", label: "Tour", hint: "Circling the city. Drag, scroll or press W to take the controls." },
+  { id: "fly", label: "Fly", hint: "W A S D to move, drag to look, Q and E to go down and up, scroll to dive, Shift for speed. V to walk." },
+  { id: "walk", label: "Walk", hint: "W A S D to walk the avenues, drag to look up at the towers, Shift to jog. V to fly." },
 ];
 
 function useHistory(eraId: string) {
@@ -85,6 +92,7 @@ function Board({ era, data }: { era: Era; data: History }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pauseOnNews, setPauseOnNews] = useState(true);
+  const [mode, setMode] = useState<CamMode>("tour");
 
   const eventsByMonth = useMemo(() => new Map(era.events.map((e) => [e.month, e.headline])), [era]);
   const headline = eventsByMonth.get(months[game.month]);
@@ -116,6 +124,8 @@ function Board({ era, data }: { era: Era; data: History }) {
         e.preventDefault();
         if (!done) setPlaying((p) => !p);
       } else if (e.code === "ArrowRight" && !playing && !done) step();
+      else if (e.code === "KeyV") setMode((m) => (m === "walk" ? "fly" : "walk"));
+      else if (e.code === "Escape") setSelected(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -142,7 +152,7 @@ function Board({ era, data }: { era: Era; data: History }) {
   return (
     <div className="relative h-[100dvh] w-full overflow-hidden">
       <div className="absolute inset-0 z-0 isolate">
-        <City companies={companies} prices={prices} month={game.month} owned={owned} selected={selected} onSelect={setSelected} autoRotate={!selected} />
+        <City companies={companies} prices={prices} month={game.month} owned={owned} selected={selected} onSelect={setSelected} mode={mode} onMode={setMode} />
       </div>
 
       {/* Top bar */}
@@ -177,7 +187,7 @@ function Board({ era, data }: { era: Era; data: History }) {
       {/* News */}
       {headline && (
         <div key={months[game.month]} className="panel slide-in absolute top-24 left-1/2 z-20 w-[min(640px,calc(100%-2rem))] -translate-x-1/2 border-glow/40 px-5 py-3 text-center">
-          <p className="text-[11px] font-bold tracking-wide text-glow">BREAKING · {monthLabel(months[game.month])}</p>
+          <p className="text-xs font-bold text-glow">Breaking news, {monthLabel(months[game.month])}</p>
           <p className="mt-0.5 font-semibold">{headline}</p>
           {!playing && !done && <p className="mt-1 text-xs text-sub">Paused for the news. Trade if you want, then press play.</p>}
         </div>
@@ -284,21 +294,41 @@ function Board({ era, data }: { era: Era; data: History }) {
           <button type="button" onClick={() => setDone(true)} className="rounded-xl border border-edge-strong px-3 py-2 text-xs font-bold hover:bg-white/5">
             End round
           </button>
+          <div className="flex w-full flex-wrap items-center gap-3 border-t border-edge pt-3">
+            <div className="flex rounded-xl bg-white/5 p-1" role="radiogroup" aria-label="Camera">
+              {VIEWS.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === v.id}
+                  onClick={(e) => {
+                    setMode(v.id);
+                    e.currentTarget.blur();
+                  }}
+                  className={`rounded-lg px-3 py-1 text-xs font-bold ${mode === v.id ? "bg-glow text-night" : "text-sub hover:text-text"}`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            <p className="min-w-0 flex-1 text-xs text-sub">{VIEWS.find((v) => v.id === mode)?.hint}</p>
+          </div>
         </div>
       </footer>
 
-      {game.month === 0 && !playing && !selected && !done && (
-        <div className="panel slide-in absolute top-1/2 left-1/2 z-30 w-[min(440px,calc(100%-2rem))] -translate-x-1/2 -translate-y-1/2 p-6 text-center">
-          <p className="text-xs font-bold tracking-wide text-glow">{era.years}</p>
+      {game.month === 0 && !playing && !selected && !done && mode === "tour" && (
+        <div className="panel slide-in absolute top-28 left-4 z-30 w-[min(400px,calc(100%-2rem))] p-6">
+          <p className="num text-xs font-bold text-glow">{era.years}</p>
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight">{era.name}</h1>
           <p className="mt-2 text-sub">{era.pitch}</p>
           <p className="mt-4 text-sm text-sub">
-            You have <strong className="text-text">{usd(STARTING_CASH)}</strong>. Click buildings to buy and sell, then press play. Each trade costs $5.
+            You have <strong className="text-text">{usd(STARTING_CASH)}</strong>. Click a tower to buy or sell, then press play. Each trade costs $5.
           </p>
           <button type="button" onClick={() => setPlaying(true)} className="mt-5 rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110">
             Start the clock
           </button>
-          <p className="mt-3 text-[11px] text-dim">Space to play or pause, → to step one month.</p>
+          <p className="mt-3 text-[11px] text-dim">Space plays or pauses, the right arrow steps one month. Fly with W A S D and drag to look, or press V to walk the streets.</p>
         </div>
       )}
 

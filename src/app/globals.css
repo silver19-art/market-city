@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
-/* Dusk over the city: deep indigo sky, warm window light, teal for gains, coral for losses. */
+/* Manhattan at night: navy sky, sodium-lamp amber for actions, teal gains, coral losses. */
 @theme {
-  --color-night: #0f0d24;
-  --color-dusk: #1b1640;
-  --color-panel: rgb(22 19 52 / 0.78);
-  --color-panel-solid: #191538;
-  --color-edge: rgb(255 255 255 / 0.09);
-  --color-edge-strong: rgb(255 255 255 / 0.16);
-  --color-text: #f1eefc;
-  --color-sub: #a9a3cc;
-  --color-dim: #726c99;
-  --color-up: #2fb8a6;
-  --color-down: #f2705a;
-  --color-glow: #ffc566;
+  --color-night: #070b17;
+  --color-dusk: #111833;
+  --color-panel: rgb(10 15 32 / 0.8);
+  --color-panel-solid: #0d1328;
+  --color-edge: rgb(186 200 255 / 0.1);
+  --color-edge-strong: rgb(186 200 255 / 0.2);
+  --color-text: #eef1fa;
+  --color-sub: #9ba6c3;
+  --color-dim: #66708d;
+  --color-up: #3cc6a8;
+  --color-down: #ff6b57;
+  --color-glow: #ffb547;
   --color-own: #ffd36b;
-  --font-sans: "Manrope Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
 }
 
 html {
@@ -32,14 +32,24 @@ body {
 
 .sky {
   background:
-    radial-gradient(1200px 600px at 70% 110%, rgb(255 153 102 / 0.28), transparent 60%),
-    linear-gradient(180deg, #0c0a1f 0%, #1b1640 55%, #3a2552 100%);
+    radial-gradient(1100px 520px at 50% 115%, rgb(120 96 200 / 0.3), transparent 62%),
+    linear-gradient(180deg, #03050c 0%, #0b1230 58%, #231f48 100%);
+  background-attachment: fixed;
+}
+
+/* Condensed headings, like street and subway signage. */
+h1,
+h2,
+h3,
+.sign {
+  font-stretch: 76%;
+  letter-spacing: -0.01em;
 }
 
 .panel {
   background: var(--color-panel);
   border: 1px solid var(--color-edge);
-  border-radius: 18px;
+  border-radius: 12px;
   backdrop-filter: blur(14px);
   box-shadow: 0 20px 50px -24px rgb(0 0 0 / 0.7);
 }
