@@ -140,3 +140,19 @@ describe("short selling", () => {
     expect(g.trades.at(-1)?.forced).toBe(true);
   });
 });
+
+describe("descriptions", () => {
+  it("every company and industry in every era has one", async () => {
+    const { aboutFor } = await import("./about");
+    for (const e of ERAS) for (const c of e.companies) expect(aboutFor(e.id, c.ticker), `${e.id} ${c.ticker}`).toBeTruthy();
+  });
+});
+
+describe("blurbs", () => {
+  it("drop a repeated company name but keep different ones", async () => {
+    const { blurbFor } = await import("./about");
+    expect(blurbFor("crisis", "MCD", "McDonald's")).toMatch(/^The world's largest restaurant chain/);
+    expect(blurbFor("dotcom", "C", "Citigroup")).toMatch(/^Travelers Group/);
+    expect(blurbFor("ai", "GOOGL", "Alphabet (Google)")).toMatch(/^Google's parent company/);
+  });
+});

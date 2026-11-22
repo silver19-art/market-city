@@ -16,7 +16,7 @@ export interface Focus {
 }
 
 const EYE = 0.13; // about 2 m at this scale, where an avenue is ~30 m wide
-const MOVE_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "ArrowUp", "ArrowDown"]);
+const MOVE_KEYS = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "KeyQ", "KeyE", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 const PITCH = { fly: [-1.45, 0.7], walk: [-0.6, 1.35] } as const;
 const IDLE_SPIN_MS = 12000;
 
@@ -186,7 +186,7 @@ export function CameraRig({ mode, focus, centerZ }: { mode: CamMode; focus: Focu
     const mode = modeRef.current;
     const K = keys.current;
     const fwd = (K.has("KeyW") || K.has("ArrowUp") ? 1 : 0) - (K.has("KeyS") || K.has("ArrowDown") ? 1 : 0);
-    const side = (K.has("KeyD") ? 1 : 0) - (K.has("KeyA") ? 1 : 0);
+    const side = (K.has("KeyD") || K.has("ArrowRight") ? 1 : 0) - (K.has("KeyA") || K.has("ArrowLeft") ? 1 : 0);
     const lift = (K.has("KeyE") ? 1 : 0) - (K.has("KeyQ") ? 1 : 0);
     const fast = K.has("ShiftLeft") || K.has("ShiftRight");
     const k = 1 - Math.exp(-dt * 3);

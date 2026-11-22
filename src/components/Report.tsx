@@ -4,6 +4,7 @@ import { report, type GameState, type Prices } from "@/lib/engine";
 import { benchmarkLong, benchmarkName, unitName, type Era } from "@/lib/eras";
 import { monthLabel, pct, usd } from "@/lib/format";
 import Link from "next/link";
+import { useEffect } from "react";
 
 function Bar({ label, value, max, you = false }: { label: string; value: number; max: number; you?: boolean }) {
   const w = max > 0 ? Math.max(2, (Math.abs(value) / max) * 100) : 2;
@@ -20,7 +21,28 @@ function Bar({ label, value, max, you = false }: { label: string; value: number;
   );
 }
 
-export function Report({ era, game, prices, spy, months, onReplay }: { era: Era; game: GameState; prices: Prices; spy: (number | null)[]; months: string[]; onReplay: () => void }) {
+export function Report({
+  era,
+  game,
+  prices,
+  spy,
+  months,
+  onReplay,
+  onClose,
+}: {
+  era: Era;
+  game: GameState;
+  prices: Prices;
+  spy: (number | null)[];
+  months: string[];
+  onReplay: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.code === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const r = report(game, prices, spy, era.companies.map((c) => c.ticker));
   const bench = benchmarkName(era) === "S&P 500" ? "S&P 500" : "stock market";
   const comps = [r.totalReturn, r.benchmarkReturn ?? 0, r.equalWeightReturn ?? 0];
@@ -45,8 +67,11 @@ export function Report({ era, game, prices, spy, months, onReplay }: { era: Era;
     lessons.push("Survivorship bias: this city only has companies still trading today, because that's the only free data. Companies that went under, like Pan Am, Enron and Lehman Brothers, aren't here, so real investors faced worse odds than this game.");
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-night/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="report-title">
-      <div className="panel slide-in my-8 w-full max-w-2xl bg-panel-solid p-6 sm:p-8">
+    <div className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-night/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="report-title" onClick={onClose}>
+      <div className="panel slide-in relative my-8 w-full max-w-2xl bg-panel-solid p-6 sm:p-8" onClick={(e) => e.stopPropagation()}>
+        <button type="button" onClick={onClose} className="absolute top-4 right-4 rounded-lg px-2 py-1 text-sub hover:bg-white/5 hover:text-text" aria-label="Close report and look around the city">
+          ✕
+        </button>
         <p className="text-sm font-semibold text-sub">
           {era.name} · {monthLabel(months[0])} to {monthLabel(months[game.month])}
         </p>
@@ -102,6 +127,9 @@ export function Report({ era, game, prices, spy, months, onReplay }: { era: Era;
         <div className="mt-8 flex flex-wrap gap-3">
           <button type="button" onClick={onReplay} className="rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110">
             Play this era again
+          </button>
+          <button type="button" onClick={onClose} className="rounded-xl border border-edge-strong px-5 py-2.5 text-sm font-bold hover:bg-white/5">
+            See the final city
           </button>
           <Link href="/" className="rounded-xl border border-edge-strong px-5 py-2.5 text-sm font-bold hover:bg-white/5">
             Pick another era

@@ -29,9 +29,9 @@ const SPEEDS = [
 ];
 
 const VIEWS: { id: CamMode; label: string; hint: string }[] = [
-  { id: "orbit", label: "Mouse", hint: "Drag to spin, right-drag to slide, scroll to zoom toward your cursor. W A S D slide too. V to walk." },
-  { id: "fly", label: "Fly", hint: "W A S D to move, drag to look, Q and E to go down and up, scroll to dive, Shift for speed. V to walk." },
-  { id: "walk", label: "Walk", hint: "W A S D to walk the avenues, drag to look up at the towers, Shift to jog. V to go back." },
+  { id: "orbit", label: "Mouse", hint: "Drag to spin, right-drag or arrow keys to slide, scroll to zoom toward your cursor. W A S D work too. V to walk." },
+  { id: "fly", label: "Fly", hint: "W A S D or arrow keys to move, drag to look, Q and E to go down and up, scroll to dive, Shift for speed. V to walk." },
+  { id: "walk", label: "Walk", hint: "W A S D or arrow keys to walk the avenues, drag to look up at the towers, Shift to jog. V to go back." },
 ];
 
 function useHistory(eraId: string) {
@@ -91,6 +91,7 @@ function Board({ era, data }: { era: Era; data: History }) {
   const [speed, setSpeed] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [reportOpen, setReportOpen] = useState(true);
   const [pauseOnNews, setPauseOnNews] = useState(true);
   const [mode, setMode] = useState<CamMode>("orbit");
 
@@ -105,6 +106,7 @@ function Board({ era, data }: { era: Era; data: History }) {
       if (next.month >= last) {
         setPlaying(false);
         setDone(true);
+        setReportOpen(true);
       } else if (pauseOnNews && eventsByMonth.has(months[next.month])) setPlaying(false);
       return next;
     });
@@ -116,14 +118,14 @@ function Board({ era, data }: { era: Era; data: History }) {
     return () => window.clearInterval(id);
   }, [playing, speed, step]);
 
-  // Keyboard: space to play/pause, right arrow to step.
+  // Keyboard: space to play/pause, N to step a month. Arrow keys belong to the camera.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
       if (e.code === "Space") {
         e.preventDefault();
         if (!done) setPlaying((p) => !p);
-      } else if (e.code === "ArrowRight" && !playing && !done) step();
+      } else if ((e.code === "KeyN" || e.code === "Period") && !playing && !done) step();
       else if (e.code === "KeyV") setMode((m) => (m === "walk" ? "orbit" : "walk"));
       else if (e.code === "Escape") setSelected(null);
     };
@@ -244,7 +246,7 @@ function Board({ era, data }: { era: Era; data: History }) {
       {/* Right: selected stock */}
       {company && (
         <div className="absolute top-24 right-4 bottom-28 z-20 flex w-[min(360px,calc(100%-2rem))] items-start overflow-y-auto">
-          <StockPanel key={company.ticker} era={era} company={company} prices={prices} months={months} events={era.events} spy={spy} game={game} onTrade={setGame} onClose={() => setSelected(null)} />
+          <StockPanel key={company.ticker} era={era} company={company} prices={prices} months={months} events={era.events} spy={spy} game={game} onTrade={setGame} onClose={() => setSelected(null)} roundOver={done} />
         </div>
       )}
 
@@ -301,9 +303,23 @@ function Board({ era, data }: { era: Era; data: History }) {
             <input type="checkbox" checked={pauseOnNews} onChange={(e) => setPauseOnNews(e.target.checked)} className="accent-[var(--color-glow)]" />
             Pause on news
           </label>
-          <button type="button" onClick={() => setDone(true)} className="rounded-xl border border-edge-strong px-3 py-2 text-xs font-bold hover:bg-white/5">
-            End round
-          </button>
+          {done ? (
+            <button type="button" onClick={() => setReportOpen(true)} className="rounded-xl bg-glow px-3 py-2 text-xs font-extrabold text-night hover:brightness-110">
+              Show report
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setPlaying(false);
+                setDone(true);
+                setReportOpen(true);
+              }}
+              className="rounded-xl border border-edge-strong px-3 py-2 text-xs font-bold hover:bg-white/5"
+            >
+              End round
+            </button>
+          )}
           <div className="flex w-full flex-wrap items-center gap-3 border-t border-edge pt-3">
             <div className="flex rounded-xl bg-white/5 p-1" role="radiogroup" aria-label="Camera">
               {VIEWS.map((v) => (
@@ -338,11 +354,11 @@ function Board({ era, data }: { era: Era; data: History }) {
           <button type="button" onClick={() => setPlaying(true)} className="mt-5 rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110">
             Start the clock
           </button>
-          <p className="mt-3 text-[11px] text-dim">Space plays or pauses, the right arrow steps one month. Drag to spin the city, right-drag to slide, scroll to zoom. Press V to walk the streets.</p>
+          <p className="mt-3 text-[11px] text-dim">Space plays or pauses, N steps one month. Drag to spin the city, right-drag or the arrow keys to slide, scroll to zoom. Press V to walk the streets.</p>
         </div>
       )}
 
-      {done && <Report era={era} game={game} prices={prices} spy={spy} months={months} onReplay={replay} />}
+      {done && reportOpen && <Report era={era} game={game} prices={prices} spy={spy} months={months} onReplay={replay} onClose={() => setReportOpen(false)} />}
     </div>
   );
 }

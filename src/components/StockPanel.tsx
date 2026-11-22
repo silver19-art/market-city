@@ -2,6 +2,7 @@
 
 import { buy, cover, portfolioValue, priceAt, sell, short, shortLiability, SHORT_LIMIT, type GameState, type Prices, type TradeResult } from "@/lib/engine";
 import { benchmarkName, type Company, type Era } from "@/lib/eras";
+import { blurbFor } from "@/lib/about";
 import { level, monthLabel, pct, usd } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -19,7 +20,9 @@ export function StockPanel({
   game,
   onTrade,
   onClose,
+  roundOver = false,
 }: {
+  roundOver?: boolean;
   era: Era;
   company: Company;
   prices: Prices;
@@ -70,6 +73,7 @@ export function StockPanel({
             {company.ticker}, {company.sector}
           </p>
           <h2 className="text-xl font-extrabold">{company.name}</h2>
+          {blurbFor(era.id, company.ticker, company.name) && <p className="mt-1.5 text-sm leading-snug text-sub">{blurbFor(era.id, company.ticker, company.name)}</p>}
         </div>
         <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-sub hover:bg-white/5 hover:text-text" aria-label="Close">
           ✕
@@ -111,7 +115,8 @@ export function StockPanel({
         </div>
       )}
 
-      {listed && (
+      {roundOver && <p className="mt-4 rounded-xl bg-white/5 p-3 text-sm text-sub">The round is over, so trading is closed. These are the final prices.</p>}
+      {listed && !roundOver && (
         <>
           <div className="mt-4 grid grid-cols-2 rounded-xl bg-white/5 p-1" role="tablist" aria-label="Trade type">
             {(["long", "short"] as const).map((s) => (
