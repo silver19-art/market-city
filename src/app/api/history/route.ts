@@ -1,5 +1,7 @@
 import { BENCHMARK, eraById, monthsBetween } from "@/lib/eras";
+import { FACTORS_FILE, FRENCH_BASE, INDUSTRIES_FILE, marketReturns, parseFrenchMonthly, toIndex } from "@/lib/french";
 import { compact, parseStooqCsv, parseYahooChart, type Series } from "@/lib/history";
+import { unzipSync, strFromU8 } from "fflate";
 import { cacheLife } from "next/cache";
 
 const UA = "Mozilla/5.0 (compatible; MarketCity/1.0)";
@@ -44,14 +46,41 @@ async function series(ticker: string, months: string[]) {
   return (await fromYahoo(ticker, months)) ?? (await fromStooq(ticker, months));
 }
 
-/** Monthly prices for every company in an era plus the S&P 500 (SPY). History never changes, so cache for a long time. */
+/** Download one zipped CSV from the French data library and parse its monthly table. */
+async function french(file: string) {
+  const res = await fetch(FRENCH_BASE + file, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(20_000), cache: "no-store" });
+  if (!res.ok) throw new Error(`French data ${res.status}`);
+  const files = unzipSync(new Uint8Array(await res.arrayBuffer()));
+  const csv = Object.values(files)[0];
+  if (!csv) throw new Error("empty archive");
+  return parseFrenchMonthly(strFromU8(csv));
+}
+
+/** Monthly prices for every company in an era plus its benchmark. History never changes, so cache for a long time. */
 async function loadEra(id: string) {
   "use cache";
   cacheLife("max");
   const era = eraById(id);
   if (!era) throw new Error("unknown era");
   const months = monthsBetween(era.start, era.end);
-  const tickers = [...era.companies.map((c) => c.ticker), BENCHMARK];
+
+  const market = era.benchmark === "MARKET" ? toIndex(marketReturns(await french(FACTORS_FILE)), months) : null;
+  if (era.benchmark === "MARKET" && !market) throw new Error("market data unavailable");
+
+  if (era.source === "industries") {
+    const table = await french(INDUSTRIES_FILE);
+    const prices: Record<string, Series> = {};
+    const missing: string[] = [];
+    for (const c of era.companies) {
+      const s = table[c.ticker] ? toIndex(table[c.ticker], months) : null;
+      if (s) prices[c.ticker] = compact(s);
+      else missing.push(c.ticker);
+    }
+    if (missing.length > era.companies.length / 3) throw new Error("industry data unavailable");
+    return { era: era.id, months, prices, spy: compact(market!), missing };
+  }
+
+  const tickers = [...era.companies.map((c) => c.ticker), ...(market ? [] : [BENCHMARK])];
 
   const results: Record<string, Series | null> = {};
   // A few at a time, to be polite to the free sources.
@@ -63,11 +92,12 @@ async function loadEra(id: string) {
 
   const missing = tickers.filter((t) => !results[t]);
   // Don't cache a mostly failed load: throwing skips the cache so the next request retries.
-  if (!results[BENCHMARK] || missing.length > tickers.length / 3) throw new Error(`price sources unavailable (${missing.length} missing)`);
+  const bench = market ?? results[BENCHMARK];
+  if (!bench || missing.length > tickers.length / 3) throw new Error(`price sources unavailable (${missing.length} missing)`);
 
   const prices: Record<string, Series> = {};
   for (const c of era.companies) if (results[c.ticker]) prices[c.ticker] = compact(results[c.ticker]!);
-  return { era: era.id, months, prices, spy: compact(results[BENCHMARK]!), missing };
+  return { era: era.id, months, prices, spy: compact(bench), missing };
 }
 
 export async function GET(request: Request) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { report, type GameState, type Prices } from "@/lib/engine";
-import type { Era } from "@/lib/eras";
+import { benchmarkLong, benchmarkName, unitName, type Era } from "@/lib/eras";
 import { monthLabel, pct, usd } from "@/lib/format";
 import Link from "next/link";
 
@@ -22,14 +22,15 @@ function Bar({ label, value, max, you = false }: { label: string; value: number;
 
 export function Report({ era, game, prices, spy, months, onReplay }: { era: Era; game: GameState; prices: Prices; spy: (number | null)[]; months: string[]; onReplay: () => void }) {
   const r = report(game, prices, spy, era.companies.map((c) => c.ticker));
+  const bench = benchmarkName(era) === "S&P 500" ? "S&P 500" : "stock market";
   const comps = [r.totalReturn, r.benchmarkReturn ?? 0, r.equalWeightReturn ?? 0];
   const max = Math.max(...comps.map(Math.abs), 0.01);
   const verdict =
     r.benchmarkReturn === null
       ? "Round complete."
       : r.totalReturn > r.benchmarkReturn
-        ? `You beat the S&P 500 by ${((r.totalReturn - r.benchmarkReturn) * 100).toFixed(1)} percentage points.`
-        : `The S&P 500 beat you by ${((r.benchmarkReturn - r.totalReturn) * 100).toFixed(1)} percentage points.`;
+        ? `You beat the ${bench} by ${((r.totalReturn - r.benchmarkReturn) * 100).toFixed(1)} percentage points.`
+        : `The ${bench} beat you by ${((r.benchmarkReturn - r.totalReturn) * 100).toFixed(1)} percentage points.`;
 
   const lessons: string[] = [era.lesson];
   if (r.trades >= 20) lessons.push(`You made ${r.trades} trades and paid ${usd(r.feesPaid)} in fees. Frequent trading has real costs, and most professionals fail to beat a simple index fund after fees.`);
@@ -38,7 +39,10 @@ export function Report({ era, game, prices, spy, months, onReplay }: { era: Era;
   if (r.maxDrawdown > 0.4) lessons.push(`At your worst point you were down ${pct(r.maxDrawdown, 0, false)} from your peak. Ask yourself honestly whether you would have held on with real money.`);
   if (r.marginCalls > 0) lessons.push(`You were margin-called ${r.marginCalls === 1 ? "once" : `${r.marginCalls} times`}. A short can lose more than you put in, because a stock can keep rising, and brokers force you out at the worst moment.`);
   else if (r.shorted) lessons.push("You shorted stocks this round. Shorting pays when prices fall, but markets rise more often than they fall, so short sellers are fighting the long-run trend.");
-  lessons.push("Survivorship bias: this city only has companies still trading today, because that's the only free data. Companies that went under, like Enron, WorldCom and Lehman Brothers, aren't here, so real investors faced worse odds than this game.");
+  if (era.source === "industries")
+    lessons.push("Each building here was a whole industry, which spreads your bet across many companies. Real investors who bought single stocks in this era often did far worse, because many companies went bankrupt.");
+  else
+    lessons.push("Survivorship bias: this city only has companies still trading today, because that's the only free data. Companies that went under, like Pan Am, Enron and Lehman Brothers, aren't here, so real investors faced worse odds than this game.");
 
   return (
     <div className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-night/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="report-title">
@@ -53,14 +57,14 @@ export function Report({ era, game, prices, spy, months, onReplay }: { era: Era;
 
         <div className="mt-6 space-y-4">
           <Bar label="Your portfolio" value={r.totalReturn} max={max} you />
-          {r.benchmarkReturn !== null && <Bar label="S&P 500 (SPY), buy and hold" value={r.benchmarkReturn} max={max} />}
-          {r.equalWeightReturn !== null && <Bar label="Every company equally, buy and hold" value={r.equalWeightReturn} max={max} />}
+          {r.benchmarkReturn !== null && <Bar label={benchmarkLong(era)} value={r.benchmarkReturn} max={max} />}
+          {r.equalWeightReturn !== null && <Bar label={`Every ${unitName(era)} equally, buy and hold`} value={r.equalWeightReturn} max={max} />}
         </div>
 
         <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             ["Worst drop", pct(-r.maxDrawdown, 0)],
-            ["S&P worst drop", r.benchmarkDrawdown !== null ? pct(-r.benchmarkDrawdown, 0) : "–"],
+            [`${bench} worst drop`, r.benchmarkDrawdown !== null ? pct(-r.benchmarkDrawdown, 0) : "–"],
             ["Trades", String(r.trades)],
             ["Fees paid", usd(r.feesPaid)],
           ].map(([k, v]) => (

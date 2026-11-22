@@ -134,7 +134,7 @@ export default function Home() {
         <Skyline />
       </div>
 
-      <h2 className="mt-14 text-xl font-extrabold tracking-tight">Choose an era</h2>
+      <h2 className="mt-14 text-xl font-extrabold tracking-tight">Choose an era, from 1928 to today</h2>
       <ul className="mt-5 grid gap-4 sm:grid-cols-2">
         {ERAS.map((e) => (
           <li key={e.id}>
@@ -142,6 +142,7 @@ export default function Home() {
               <span className="num text-xs font-bold text-glow">{e.years}</span>
               <span className="sign mt-1 text-3xl font-extrabold">{e.name}</span>
               <span className="mt-2 text-sub">{e.pitch}</span>
+              {e.source === "industries" && <span className="mt-2 text-xs text-dim">Before stock-by-stock records, so each tower is a whole industry.</span>}
               <span className="mt-4 flex flex-wrap gap-1.5">
                 {e.companies.slice(0, 7).map((c) => (
                   <span key={c.ticker} className="rounded-md bg-white/5 px-2 py-0.5 text-[11px] font-bold text-sub">

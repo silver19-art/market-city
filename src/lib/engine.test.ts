@@ -13,12 +13,16 @@ describe("eras", () => {
     expect(monthsBetween("1999-11", "2000-02")).toEqual(["1999-11", "1999-12", "2000-01", "2000-02"]);
   });
   it("every era is well formed", () => {
-    expect(ERAS.length).toBe(4);
+    expect(ERAS.length).toBe(8);
+    const FF30 = "Food Beer Smoke Games Books Hshld Clths Hlth Chems Txtls Cnstr Steel FabPr ElcEq Autos Carry Mines Coal Oil Util Telcm Servs BusEq Paper Trans Whlsl Rtail Meals Fin Other".split(" ");
     for (const e of ERAS) {
       const months = monthsBetween(e.start, e.end);
       expect(months.length).toBeGreaterThan(24);
       expect(new Set(e.companies.map((c) => c.ticker)).size).toBe(e.companies.length);
       for (const ev of e.events) expect(months).toContain(ev.month);
+      if (e.source === "industries") for (const c of e.companies) expect(FF30).toContain(c.ticker);
+      // SPY only exists from 1993, so earlier eras must benchmark against the whole market.
+      if (e.start < "1993-02") expect(e.benchmark).toBe("MARKET");
     }
   });
 });

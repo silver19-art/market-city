@@ -12,3 +12,5 @@ export const monthLabel = (ym: string, long = false) => {
 };
 
 export const price = (n: number) => (n >= 1000 ? usd(n) : usd(n, true));
+/** Industry eras trade an index that starts at 100, not a dollar share price. */
+export const level = (n: number, isIndex = false) => (isIndex ? n.toFixed(1) : price(n));

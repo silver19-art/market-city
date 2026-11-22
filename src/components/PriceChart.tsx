@@ -1,7 +1,7 @@
 "use client";
 
 import type { Trade } from "@/lib/engine";
-import { monthLabel, pct, price as fmtPrice } from "@/lib/format";
+import { level, monthLabel, pct } from "@/lib/format";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const STOCK = "#ffb547";
@@ -46,6 +46,8 @@ export function PriceChart({
   spy,
   height = 150,
   big = false,
+  marketLabel = "S&P 500",
+  isIndex = false,
 }: {
   ticker: string;
   series: (number | null)[];
@@ -56,6 +58,8 @@ export function PriceChart({
   spy?: (number | null)[];
   height?: number;
   big?: boolean;
+  marketLabel?: string;
+  isIndex?: boolean;
 }) {
   const [wrap, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
@@ -115,7 +119,7 @@ export function PriceChart({
   const hEvent = h != null ? events.find((e) => e.month === months[h]) : undefined;
   const hTrades = h != null ? marks.filter((t) => t.month === h) : [];
   const tipLeft = h != null ? Math.min(Math.max(x(h) - 90, 0), width - 180) : 0;
-  const fmtAxis = (v: number) => (compare ? `${Math.round(v)}` : v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v < 10 ? v.toFixed(2) : Math.round(v)}`);
+  const fmtAxis = (v: number) => (compare || isIndex ? `${Math.round(v)}` : v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v < 10 ? v.toFixed(2) : Math.round(v)}`);
 
   return (
     <div ref={wrap} className="relative w-full select-none">
@@ -179,14 +183,14 @@ export function PriceChart({
           <p className="font-bold text-text">{monthLabel(months[h], true)}</p>
           {hv != null ? (
             <p className="num mt-0.5 text-text">
-              {fmtPrice(hv)} {base && <span className="text-sub">({pct(hv / base - 1, 0)} since start)</span>}
+              {level(hv, isIndex)} {base && <span className="text-sub">({pct(hv / base - 1, 0)} since start)</span>}
             </p>
           ) : (
             <p className="mt-0.5 text-sub">Not trading yet</p>
           )}
           {compare && mkt[h] != null && pts[h] != null && (
             <p className="num text-sub">
-              S&P 500 {pct(mkt[h]! / 100 - 1, 0)}, {ticker} {pct(pts[h]! / 100 - 1, 0)}
+              {marketLabel} {pct(mkt[h]! / 100 - 1, 0)}, {ticker} {pct(pts[h]! / 100 - 1, 0)}
             </p>
           )}
           {hTrades.map((t, k) => (
@@ -208,7 +212,7 @@ export function PriceChart({
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="h-0.5 w-3 rounded" style={{ background: MARKET }} />
-                S&P 500
+                {marketLabel}
               </span>
               <span>Both start at 100</span>
             </>

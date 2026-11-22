@@ -1,7 +1,7 @@
 "use client";
 
 import { advance, newGame, portfolioValue, priceAt, STARTING_CASH, type GameState, type Prices } from "@/lib/engine";
-import { eraById, type Era } from "@/lib/eras";
+import { benchmarkName, eraById, unitName, type Era } from "@/lib/eras";
 import { monthLabel, pct, usd } from "@/lib/format";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -74,7 +74,7 @@ export function Game({ eraId }: { eraId: string }) {
       <div className="grid min-h-screen place-items-center text-center text-sub">
         <div>
           <p className="text-lg font-bold text-text">Loading {era.name}</p>
-          <p className="mt-1 text-sm">Fetching real monthly prices for {era.companies.length} companies…</p>
+          <p className="mt-1 text-sm">Fetching real monthly {era.source === "industries" ? "returns" : "prices"} for {era.companies.length} {unitName(era) === "industry" ? "industries" : "companies"}…</p>
         </div>
       </div>
     );
@@ -180,7 +180,7 @@ function Board({ era, data }: { era: Era; data: History }) {
             <p className={`num text-lg leading-tight font-extrabold ${ret >= 0 ? "text-up" : "text-down"}`}>{pct(ret)}</p>
           </div>
           <div>
-            <p className="text-[11px] font-semibold text-sub">S&P 500</p>
+            <p className="text-[11px] font-semibold text-sub">{benchmarkName(era)}</p>
             <p className={`num text-lg leading-tight font-extrabold ${(spyRet ?? 0) >= 0 ? "text-up" : "text-down"}`}>{spyRet === null ? "–" : pct(spyRet)}</p>
           </div>
         </div>
@@ -244,7 +244,7 @@ function Board({ era, data }: { era: Era; data: History }) {
       {/* Right: selected stock */}
       {company && (
         <div className="absolute top-24 right-4 bottom-28 z-20 flex w-[min(360px,calc(100%-2rem))] items-start overflow-y-auto">
-          <StockPanel key={company.ticker} company={company} prices={prices} months={months} events={era.events} spy={spy} game={game} onTrade={setGame} onClose={() => setSelected(null)} />
+          <StockPanel key={company.ticker} era={era} company={company} prices={prices} months={months} events={era.events} spy={spy} game={game} onTrade={setGame} onClose={() => setSelected(null)} />
         </div>
       )}
 

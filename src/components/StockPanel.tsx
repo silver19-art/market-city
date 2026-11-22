@@ -1,8 +1,8 @@
 "use client";
 
 import { buy, cover, portfolioValue, priceAt, sell, short, shortLiability, SHORT_LIMIT, type GameState, type Prices, type TradeResult } from "@/lib/engine";
-import type { Company } from "@/lib/eras";
-import { monthLabel, pct, price, usd } from "@/lib/format";
+import { benchmarkName, type Company, type Era } from "@/lib/eras";
+import { level, monthLabel, pct, usd } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { PriceChart } from "./PriceChart";
@@ -10,6 +10,7 @@ import { PriceChart } from "./PriceChart";
 type Side = "long" | "short";
 
 export function StockPanel({
+  era,
   company,
   prices,
   months,
@@ -19,6 +20,7 @@ export function StockPanel({
   onTrade,
   onClose,
 }: {
+  era: Era;
   company: Company;
   prices: Prices;
   months: string[];
@@ -33,6 +35,8 @@ export function StockPanel({
   const [expanded, setExpanded] = useState(false);
   const held = game.shares[company.ticker] ?? 0;
   const [side, setSide] = useState<Side>(held < 0 ? "short" : "long");
+  const isIndex = era.source === "industries";
+  const price = (n: number) => level(n, isIndex);
   const series = prices[company.ticker] ?? [];
   const now = priceAt(prices, company.ticker, game.month);
   const listed = series[game.month] != null;
@@ -50,7 +54,7 @@ export function StockPanel({
     if (r.ok) {
       onTrade(r.state);
       const t = r.state.trades[r.state.trades.length - 1];
-      setMsg({ ok: true, text: `${verb} ${t.shares.toFixed(3)} shares at ${price(t.price)} ($5 fee).` });
+      setMsg({ ok: true, text: `${verb} ${t.shares.toFixed(3)} ${isIndex ? "units" : "shares"} at ${price(t.price)} ($5 fee).` });
     } else setMsg({ ok: false, text: r.reason });
   };
 
@@ -80,9 +84,9 @@ export function StockPanel({
             <span className="num text-3xl font-extrabold">{now ? price(now) : "–"}</span>
             {now && prev && <span className={`num text-sm font-bold ${now >= prev ? "text-up" : "text-down"}`}>{pct(now / prev - 1)} this month</span>}
           </div>
-          {now && first && <p className="num text-xs text-sub">{pct(now / first - 1, 0)} since the era began</p>}
+          {now && first && <p className="num text-xs text-sub">{pct(now / first - 1, 0)} since the era began{isIndex ? ". Industry index, dividends included, started at 100" : ""}</p>}
           <div className="mt-3">
-            <PriceChart ticker={company.ticker} series={series} months={months} month={game.month} trades={game.trades} events={events} />
+            <PriceChart ticker={company.ticker} series={series} months={months} month={game.month} trades={game.trades} events={events} isIndex={isIndex} />
           </div>
           <button type="button" onClick={() => setExpanded(true)} className="mt-1 text-xs font-bold text-glow hover:underline">
             Open full chart
@@ -204,12 +208,13 @@ export function StockPanel({
       )}
       {msg && <p className={`mt-3 text-xs ${msg.ok ? "text-up" : "text-down"}`}>{msg.text}</p>}
 
-      {expanded && <ChartModal company={company} series={series} months={months} month={game.month} game={game} events={events} spy={spy} onClose={() => setExpanded(false)} />}
+      {expanded && <ChartModal era={era} company={company} series={series} months={months} month={game.month} game={game} events={events} spy={spy} onClose={() => setExpanded(false)} />}
     </section>
   );
 }
 
 function ChartModal({
+  era,
   company,
   series,
   months,
@@ -219,6 +224,7 @@ function ChartModal({
   spy,
   onClose,
 }: {
+  era: Era;
   company: Company;
   series: (number | null)[];
   months: string[];
@@ -240,6 +246,8 @@ function ChartModal({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
 
+  const isIndex = era.source === "industries";
+  const price = (n: number) => level(n, isIndex);
   const seen = series.slice(0, month + 1).filter((v): v is number => v != null);
   const start = seen[0];
   const nowP = seen[seen.length - 1];
@@ -260,14 +268,14 @@ function ChartModal({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold text-sub">
-              {company.ticker}, monthly closes through {monthLabel(months[month], true)}
+              {company.ticker}, monthly {isIndex ? "index levels" : "closes"} through {monthLabel(months[month], true)}
             </p>
             <h2 className="text-2xl font-extrabold">{company.name}</h2>
           </div>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-1.5 text-xs text-sub">
               <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="accent-[var(--color-glow)]" />
-              Compare with the S&P 500
+              Compare with the {benchmarkName(era).toLowerCase() === "s&p 500" ? "S&P 500" : "whole stock market"}
             </label>
             <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-sub hover:bg-white/5 hover:text-text" aria-label="Close chart">
               ✕
@@ -283,7 +291,7 @@ function ChartModal({
           ))}
         </dl>
         <div className="mt-4">
-          <PriceChart ticker={company.ticker} series={series} months={months} month={month} trades={game.trades} events={events} spy={compare ? spy : undefined} height={340} big />
+          <PriceChart ticker={company.ticker} series={series} months={months} month={month} trades={game.trades} events={events} spy={compare ? spy : undefined} height={340} big marketLabel={benchmarkName(era)} isIndex={isIndex} />
         </div>
         <p className="mt-3 text-xs text-dim">Dashed lines mark the news. The shaded area is the part of the era still to come. Prices are adjusted for splits and dividends.</p>
       </div>
