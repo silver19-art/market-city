@@ -30,6 +30,33 @@ const SPEEDS = [
   { label: "4×", ms: 375 },
 ];
 
+/** Countdown for the daily game: seconds left on a clock that can't be paused. */
+function TimedClock({ month, last, msPerMonth, playing, done, onShow }: { month: number; last: number; msPerMonth: number; playing: boolean; done: boolean; onShow: () => void }) {
+  const left = done ? 0 : Math.max(0, Math.ceil(((last + 1 - month) * msPerMonth) / 1000));
+  return (
+    <>
+      <div className="flex items-baseline gap-2">
+        <span className={`num text-3xl font-extrabold ${left <= 10 && playing ? "text-down" : "text-text"}`}>{`0:${String(left).padStart(2, "0")}`}</span>
+        <span className="text-xs text-sub">{done ? "Time's up" : playing ? "left" : "ready"}</span>
+      </div>
+      <div className="min-w-40 flex-1">
+        <div className="flex justify-between text-[11px] text-sub">
+          <span className="num">Month {month + 1}</span>
+          <span className="num">of {last + 1}</span>
+        </div>
+        <div className="relative mt-1 h-1.5 rounded-full bg-white/10">
+          <div className="h-full rounded-full bg-glow transition-[width] duration-500 ease-linear" style={{ width: `${(month / last) * 100}%` }} />
+        </div>
+      </div>
+      {done && (
+        <button type="button" onClick={onShow} className="rounded-xl bg-glow px-3 py-2 text-xs font-extrabold text-night hover:brightness-110">
+          Show results
+        </button>
+      )}
+    </>
+  );
+}
+
 const VIEWS: { id: CamMode; label: string; hint: string }[] = [
   { id: "orbit", label: "Mouse", hint: "Drag to spin, right-drag or arrow keys to slide, scroll to zoom toward your cursor. W A S D work too. V to walk." },
   { id: "fly", label: "Fly", hint: "W A S D or arrow keys to move, drag to look, Q and E to go down and up, scroll to dive, Shift for speed. V to walk." },
@@ -89,7 +116,18 @@ export interface EndProps {
   onReplay: () => void;
 }
 
-export function Board({ era, data, renderEnd }: { era: Era; data: History; renderEnd?: (p: EndProps) => ReactNode }) {
+export function Board({
+  era,
+  data,
+  renderEnd,
+  timed,
+}: {
+  era: Era;
+  data: History;
+  renderEnd?: (p: EndProps) => ReactNode;
+  /** Daily mode: milliseconds per month on a clock that can't be paused. */
+  timed?: number;
+}) {
   const { months, prices, spy } = data;
   const companies = useMemo(() => era.companies.filter((c) => prices[c.ticker]), [era, prices]);
   const last = months.length - 1;
@@ -122,9 +160,9 @@ export function Board({ era, data, renderEnd }: { era: Era; data: History; rende
 
   useEffect(() => {
     if (!playing) return;
-    const id = window.setInterval(step, SPEEDS[speed].ms);
+    const id = window.setInterval(step, timed ?? SPEEDS[speed].ms);
     return () => window.clearInterval(id);
-  }, [playing, speed, step]);
+  }, [playing, speed, step, timed]);
 
   // Keyboard: space to play/pause, N to step a month. Arrow keys belong to the camera.
   useEffect(() => {
@@ -132,14 +170,14 @@ export function Board({ era, data, renderEnd }: { era: Era; data: History; rende
       if ((e.target as HTMLElement)?.tagName === "INPUT") return;
       if (e.code === "Space") {
         e.preventDefault();
-        if (!done) setPlaying((p) => !p);
-      } else if ((e.code === "KeyN" || e.code === "Period") && !playing && !done) step();
+        if (!done) setPlaying((p) => (timed ? true : !p));
+      } else if ((e.code === "KeyN" || e.code === "Period") && !playing && !done && !timed) step();
       else if (e.code === "KeyV") setMode((m) => (m === "walk" ? "orbit" : "walk"));
       else if (e.code === "Escape") setSelected(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [done, playing, step]);
+  }, [done, playing, step, timed]);
 
   const value = portfolioValue(game, prices);
   const ret = value / STARTING_CASH - 1;
@@ -262,6 +300,10 @@ export function Board({ era, data, renderEnd }: { era: Era; data: History; rende
       {/* Bottom controls */}
       <footer className="absolute inset-x-0 bottom-0 z-20 flex justify-center p-4">
         <div className="panel flex w-full max-w-3xl flex-wrap items-center gap-3 px-4 py-3">
+          {timed ? (
+            <TimedClock month={game.month} last={last} msPerMonth={timed} playing={playing} done={done} onShow={() => setReportOpen(true)} />
+          ) : (
+            <>
           <button
             type="button"
             onClick={() => setPlaying((p) => !p)}
@@ -329,6 +371,8 @@ export function Board({ era, data, renderEnd }: { era: Era; data: History; rende
               End round
             </button>
           )}
+            </>
+          )}
           <div className="flex w-full flex-wrap items-center gap-3 border-t border-edge pt-3">
             <div className="flex rounded-xl bg-white/5 p-1" role="radiogroup" aria-label="Camera">
               {VIEWS.map((v) => (
@@ -358,12 +402,22 @@ export function Board({ era, data, renderEnd }: { era: Era; data: History; rende
           <h1 className="mt-1 text-2xl font-extrabold tracking-tight">{era.name}</h1>
           <p className="mt-2 text-sub">{era.pitch}</p>
           <p className="mt-4 text-sm text-sub">
-            You have <strong className="text-text">{usd(STARTING_CASH)}</strong>. Click a tower to buy or sell, then press play. Each trade costs $5.
+            {timed ? (
+              <>
+                You have <strong className="text-text">{usd(STARTING_CASH)}</strong> and <strong className="text-text">{Math.round(((last + 1) * timed) / 1000)} seconds</strong>. The clock doesn&apos;t stop, so click towers and trade as the months fly by. Each trade costs $5.
+              </>
+            ) : (
+              <>
+                You have <strong className="text-text">{usd(STARTING_CASH)}</strong>. Click a tower to buy or sell, then press play. Each trade costs $5.
+              </>
+            )}
           </p>
           <button type="button" onClick={() => setPlaying(true)} className="mt-5 rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110">
             Start the clock
           </button>
-          <p className="mt-3 text-[11px] text-dim">Space plays or pauses, N steps one month. Drag to spin the city, right-drag or the arrow keys to slide, scroll to zoom. Press V to walk the streets.</p>
+          <p className="mt-3 text-[11px] text-dim">
+            {timed ? "Drag to spin the city, scroll to zoom, click a tower to trade." : "Space plays or pauses, N steps one month. Drag to spin the city, right-drag or the arrow keys to slide, scroll to zoom. Press V to walk the streets."}
+          </p>
         </div>
       )}
 

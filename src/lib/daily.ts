@@ -10,6 +10,33 @@ import { ERAS, monthsBetween, type Company, type Sector } from "./eras";
 import { rng } from "./cityplan";
 
 export const DAILY_MONTHS = 24;
+/** 24 months in 60 seconds. */
+export const DAILY_MS_PER_MONTH = 2500;
+/** Day #1 of the Mystery Market. */
+export const LAUNCH_DAY = "2026-11-22";
+
+/** Puzzle number for sharing, like a Wordle number. */
+export function puzzleNumber(day: string) {
+  return Math.round((Date.parse(`${day}T12:00:00Z`) - Date.parse(`${LAUNCH_DAY}T12:00:00Z`)) / 86400000) + 1;
+}
+
+/**
+ * One square per month: 🟩 when your portfolio beat the market that month, 🟥 when it lagged,
+ * ⬜ when they were within a tenth of a percent. Rows of eight, like a Wordle grid.
+ */
+export function shareGrid(values: number[], market: (number | null)[]) {
+  const squares: string[] = [];
+  for (let m = 1; m < values.length; m++) {
+    const a = market[m - 1];
+    const b = market[m];
+    if (a == null || b == null || !values[m - 1]) continue;
+    const diff = values[m] / values[m - 1] - b / a;
+    squares.push(Math.abs(diff) < 0.001 ? "⬜" : diff > 0 ? "🟩" : "🟥");
+  }
+  const rows: string[] = [];
+  for (let i = 0; i < squares.length; i += 8) rows.push(squares.slice(i, i + 8).join(""));
+  return rows.join("\n");
+}
 export const DAILY_TZ = "America/New_York";
 export const FIRST_START = "1927-01";
 export const LAST_START = "2024-01";
@@ -195,7 +222,11 @@ export interface SubmittedTrade {
  * Re-run a player's trades against the real prices to compute their score on the server,
  * so nobody can post a made-up number. Trades are only allowed before the last month.
  */
-export function replayScore(trades: SubmittedTrade[], prices: Prices, months = DAILY_MONTHS): { ok: true; value: number; ret: number } | { ok: false; reason: string } {
+export function replayScore(
+  trades: SubmittedTrade[],
+  prices: Prices,
+  months = DAILY_MONTHS,
+): { ok: true; value: number; ret: number; values: number[] } | { ok: false; reason: string } {
   if (!Array.isArray(trades) || trades.length > 500) return { ok: false, reason: "Too many trades" };
   const last = months - 1;
   let g: GameState = newGame();
@@ -220,5 +251,5 @@ export function replayScore(trades: SubmittedTrade[], prices: Prices, months = D
   }
   if (i < trades.length) return { ok: false, reason: "Trades after the final month" };
   const value = portfolioValue(g, prices, last);
-  return { ok: true, value, ret: value / STARTING_CASH - 1 };
+  return { ok: true, value, ret: value / STARTING_CASH - 1, values: g.valueHistory };
 }

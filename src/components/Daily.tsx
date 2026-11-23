@@ -1,14 +1,15 @@
 "use client";
 
 import { clientId } from "@/lib/client-id";
-import { replayScore, type Puzzle, type Reveal } from "@/lib/daily";
+import { DAILY_MS_PER_MONTH, puzzleNumber, replayScore, shareGrid, type Puzzle, type Reveal } from "@/lib/daily";
 import type { Era } from "@/lib/eras";
 import { monthLabel, pct } from "@/lib/format";
 import { learnForWindow } from "@/lib/learn";
 import { recordDaily, type Badge } from "@/lib/progress";
 import type { Standing } from "@/lib/standings";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { DailyMobile } from "./DailyMobile";
 import { Board, type EndProps } from "./Game";
 import { LearnLinks } from "./LearnLinks";
 import { Countdown, StandingView } from "./StandingView";
@@ -22,6 +23,22 @@ interface Result {
   marketRet: number | null;
   reveal: Reveal;
   standing: Standing | null;
+  /** Wordle-style squares, one per month: did you beat the market? */
+  grid?: string;
+}
+
+const PHONE_QUERY = "(max-width: 767px), (pointer: coarse) and (max-width: 1100px)";
+/** Phones and small touch screens get the 2D tile layout; laptops keep the 3D city. */
+function useIsPhone() {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia(PHONE_QUERY);
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => window.matchMedia(PHONE_QUERY).matches,
+    () => false,
+  );
 }
 
 const RESULT_KEY = (day: string) => `market-city-daily-v3-${day}`;
@@ -43,6 +60,7 @@ export function Daily() {
   const [replaying, setReplaying] = useState(false);
   // Finished in this visit: keep the city on screen and show the results over it.
   const [justFinished, setJustFinished] = useState(false);
+  const phone = useIsPhone();
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -93,26 +111,22 @@ export function Daily() {
 
   if (result && !replaying && !justFinished) return <Results result={result} onReplay={() => setReplaying(true)} />;
 
-  return (
-    <Board
-      era={era}
-      data={{ months: puzzle.months, prices: puzzle.prices, spy: puzzle.spy, missing: [] }}
-      renderEnd={(p) =>
-        result ? (
-          <Results result={result} onClose={p.onClose} practice={replaying} />
-        ) : (
-          <Finish
-            {...p}
-            puzzle={puzzle}
-            onResult={(r) => {
-              setJustFinished(true);
-              setResult(r);
-            }}
-          />
-        )
-      }
-    />
-  );
+  const renderEnd = (p: EndProps) =>
+    result ? (
+      <Results result={result} onClose={p.onClose} practice={replaying} />
+    ) : (
+      <Finish
+        {...p}
+        puzzle={puzzle}
+        onResult={(r) => {
+          setJustFinished(true);
+          setResult(r);
+        }}
+      />
+    );
+
+  if (phone) return <DailyMobile puzzle={puzzle} renderEnd={renderEnd} />;
+  return <Board era={era} data={{ months: puzzle.months, prices: puzzle.prices, spy: puzzle.spy, missing: [] }} renderEnd={renderEnd} timed={DAILY_MS_PER_MONTH} />;
 }
 
 function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle; onResult: (r: Result) => void }) {
@@ -135,7 +149,7 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Couldn’t submit. Try again.");
-      const r: Result = d;
+      const r: Result = { ...d, grid: scored.ok ? shareGrid(scored.values, puzzle.spy) : undefined };
       try {
         window.localStorage.setItem(RESULT_KEY(puzzle.day), JSON.stringify(r));
       } catch {
@@ -156,6 +170,8 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
         You finished at <span className={ret >= 0 ? "text-up" : "text-down"}>{pct(ret)}</span>
       </h2>
       {endedEarly && <p className="mt-1 text-sm text-sub">You ended early, so your positions are held to Month {puzzle.months.length} for scoring.</p>}
+      {scored.ok && <p className="mt-3 text-2xl leading-tight whitespace-pre">{shareGrid(scored.values, puzzle.spy)}</p>}
+      <p className="mt-1 text-xs text-dim">One square per month: green when you beat the market, red when you trailed it.</p>
 
       {err && <p className="mt-3 text-sm text-down">{err}</p>}
       <div className="mt-6 flex flex-wrap gap-3">
@@ -163,7 +179,7 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
           {busy ? "Checking your trades…" : "Reveal the time period"}
         </button>
         <button type="button" onClick={onClose} className="rounded-xl border border-edge-strong px-5 py-2.5 text-sm font-bold hover:bg-white/5">
-          Look at the city first
+          Look around first
         </button>
       </div>
       <p className="mt-4 text-[11px] text-dim">One score per day. The server replays your trades on the real prices to check it.</p>
@@ -185,10 +201,14 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
   }, [result.day]);
 
   const share = async () => {
-    const better =
-      stand?.percentile != null ? `, better than ${Math.round(stand.percentile * 100)}% of ${stand.basis === "simulated" ? "simulated investors" : "players"}` : "";
-    const text = `Market City Mystery Market ${result.day}: ${pct(result.ret)}${better}. Can you beat it? https://market-city-game.vercel.app/daily`;
+    const better = stand?.percentile != null ? `Beat ${Math.round(stand.percentile * 100)}% of ${stand.basis === "simulated" ? "simulated investors" : "players"}` : "";
+    const text = [`Market City Mystery Market #${puzzleNumber(result.day)}`, `${pct(result.ret)}${better ? `. ${better}` : ""}`, result.grid ?? "", "https://market-city-game.vercel.app/daily"].filter(Boolean).join("\n");
     try {
+      // Phones get the native share sheet (Messages, Instagram, etc.); laptops copy to the clipboard.
+      if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
+        await navigator.share({ text });
+        return;
+      }
       await navigator.clipboard.writeText(text);
       setCopied(true);
     } catch {
@@ -198,8 +218,11 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
 
   const body = (
     <>
-      <p className="text-center text-sm font-semibold text-sub">Mystery Market, {result.day}</p>
+      <p className="text-center text-sm font-semibold text-sub">
+        Mystery Market #{puzzleNumber(result.day)}, {result.day}
+      </p>
       <p className={`num mt-1 text-center text-6xl font-extrabold ${result.ret >= 0 ? "text-up" : "text-down"}`}>{pct(result.ret)}</p>
+      {result.grid && <p className="mt-3 text-center text-2xl leading-tight whitespace-pre">{result.grid}</p>}
       <p className="mt-3 text-center text-sm font-semibold text-sub">The time period was</p>
       <p className="sign text-center text-3xl font-extrabold">
         {monthLabel(result.reveal.from, true)} to {monthLabel(result.reveal.to, true)}
@@ -220,7 +243,7 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
 
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button type="button" onClick={share} className="rounded-xl bg-glow px-5 py-2.5 text-sm font-extrabold text-night hover:brightness-110">
-          {copied ? "Copied to clipboard" : "Copy my result"}
+          {copied ? "Copied to clipboard" : "Share my result"}
         </button>
         {onClose && (
           <button type="button" onClick={onClose} className="rounded-xl border border-edge-strong px-5 py-2.5 text-sm font-bold hover:bg-white/5">

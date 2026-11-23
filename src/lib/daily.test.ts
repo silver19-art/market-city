@@ -61,3 +61,21 @@ describe("daily mystery market", () => {
     expect(sold.ok).toBe(true);
   });
 });
+
+describe("sharing", () => {
+  it("numbers puzzles from launch day", async () => {
+    const { puzzleNumber } = await import("./daily");
+    expect(puzzleNumber("2026-11-22")).toBe(1);
+    expect(puzzleNumber("2026-11-23")).toBe(2);
+    expect(puzzleNumber("2027-03-08")).toBe(107);
+  });
+
+  it("makes a square per month comparing you with the market", async () => {
+    const { shareGrid } = await import("./daily");
+    const values = [100, 110, 105, 105.05, 120];
+    const market = [100, 105, 108, 108, 108];
+    expect(shareGrid(values, market)).toBe("🟩🟥⬜🟩");
+    const long = shareGrid(Array.from({ length: 24 }, (_, i) => 100 + i * 2), Array.from({ length: 24 }, () => 100));
+    expect(long.split("\n").map((r) => [...r].length)).toEqual([8, 8, 7]);
+  });
+});
