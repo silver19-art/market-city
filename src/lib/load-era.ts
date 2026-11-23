@@ -1,4 +1,5 @@
 import "server-only";
+import { frozen } from "./kv";
 import { benchmarkTicker, eraById, monthsBetween } from "@/lib/eras";
 import { currencyOf, fxSymbol, toUsd, type Currency } from "@/lib/currency";
 import { FACTORS_FILE, FRENCH_BASE, INDUSTRIES_FILE, marketReturns, parseFrenchMonthly, toIndex } from "@/lib/french";
@@ -62,7 +63,8 @@ export async function french(file: string) {
 export async function loadEra(id: string) {
   "use cache";
   cacheLife("max");
-  return fetchEra(id);
+  // Frozen in the database so the game and the score check always use identical prices.
+  return frozen(`era:v1:${id}:data`, () => fetchEra(id));
 }
 
 async function fetchEra(id: string) {

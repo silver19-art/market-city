@@ -1,11 +1,8 @@
 import "server-only";
-import { Redis } from "@upstash/redis";
+import { redis } from "./kv";
 import { standingFrom, type Standing } from "./standings";
 
-/** Everyone's scores, in the free Upstash Redis database connected through Vercel. */
-const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
-const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
-const redis = url && token ? new Redis({ url, token }) : null;
+/* Everyone's scores, in the free Upstash Redis database connected through Vercel. */
 
 const DAILY_KEEP = 60 * 60 * 24 * 10;
 // Versioned with the puzzle picker, so a change to how puzzles are chosen starts a fresh comparison.

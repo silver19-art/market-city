@@ -4,6 +4,7 @@ import { buildPuzzle, pickPuzzle } from "./daily";
 import { monthsBetween } from "./eras";
 import { FACTORS_FILE, INDUSTRIES_FILE, marketReturns, toIndex } from "./french";
 import type { Series } from "./history";
+import { frozen } from "./kv";
 import { french, fromYahoo } from "./load-era";
 import { simulateReturns } from "./simulate";
 
@@ -13,10 +14,15 @@ const seedFor = (s: string) => {
   return h >>> 0;
 };
 
-/** The day's 24 months of data: industries or companies, plus the whole US market as the benchmark. */
+/** The day's 24 months of data, frozen the first time anyone loads it so every server scores the same prices. */
 async function windowData(day: string) {
   "use cache";
   cacheLife("max");
+  return frozen(`daily:v3:${day}:data`, () => fetchWindow(day), 60 * 60 * 24 * 10);
+}
+
+/** Industries or companies for the day's window, plus the whole US market as the benchmark. */
+async function fetchWindow(day: string) {
   const pick = pickPuzzle(day);
   const months = monthsBetween(pick.start, pick.end);
   const market = toIndex(marketReturns(await french(FACTORS_FILE)), months);

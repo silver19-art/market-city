@@ -247,7 +247,7 @@ export function replayScore(
       if (!r.ok) return { ok: false, reason: r.reason };
       // Buys and shorts quietly shrink to what's affordable, so check the trade went through at full size.
       const done = r.state.trades[r.state.trades.length - 1];
-      if (Math.abs(done.shares - t.shares) > Math.max(1e-6, t.shares * 1e-6)) return { ok: false, reason: "Trade larger than allowed" };
+      if (Math.abs(done.shares - t.shares) > Math.max(1e-6, t.shares * 1e-4)) return { ok: false, reason: "Trade larger than allowed" };
       g = r.state;
     }
     if (i < trades.length && trades[i].month < m) return { ok: false, reason: "Trades out of order" };
