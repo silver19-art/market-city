@@ -10,8 +10,9 @@ import { ERAS, monthsBetween, type Company, type Sector } from "./eras";
 import { rng } from "./cityplan";
 
 export const DAILY_MONTHS = 24;
-/** 24 months in 60 seconds. */
-export const DAILY_MS_PER_MONTH = 2500;
+/** The 23 steps from month 1 to month 24 take 60 seconds, so the round ends exactly when the clock hits 0:00. */
+export const DAILY_SECONDS = 60;
+export const DAILY_MS_PER_MONTH = Math.round((DAILY_SECONDS * 1000) / (DAILY_MONTHS - 1));
 /** Day #1 of the Mystery Market. */
 export const LAUNCH_DAY = "2026-11-22";
 

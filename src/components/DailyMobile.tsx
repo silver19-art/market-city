@@ -3,6 +3,7 @@
 import { DAILY_MS_PER_MONTH, puzzleNumber, type Puzzle } from "@/lib/daily";
 import { advance, buy, cover, newGame, portfolioValue, priceAt, sell, short, STARTING_CASH, type GameState, type TradeResult } from "@/lib/engine";
 import { pct, usd } from "@/lib/format";
+import { clockLabel, useCountdown } from "@/lib/use-countdown";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { EndProps } from "./Game";
@@ -46,7 +47,7 @@ export function DailyMobile({ puzzle, renderEnd }: { puzzle: Puzzle; renderEnd: 
   const m0 = spy.find((v) => v != null) ?? null;
   const mNow = priceAt({ m: spy }, "m", game.month);
   const marketRet = m0 && mNow ? mNow / m0 - 1 : 0;
-  const secondsLeft = done ? 0 : Math.max(0, Math.ceil(((last + 1 - game.month) * DAILY_MS_PER_MONTH) / 1000));
+  const secondsLeft = useCountdown(Math.round((last * DAILY_MS_PER_MONTH) / 1000), playing, done);
 
   const run = (r: TradeResult, verb: string) => {
     if (r.ok) {
@@ -66,7 +67,7 @@ export function DailyMobile({ puzzle, renderEnd }: { puzzle: Puzzle; renderEnd: 
             <span className="sign text-lg font-extrabold">Mystery Market #{puzzleNumber(puzzle.day)}</span>
           </Link>
           <span className={`num rounded-xl px-3 py-1 text-2xl font-extrabold ${secondsLeft <= 10 && playing ? "bg-down/20 text-down" : "bg-white/10 text-text"}`} aria-live="off">
-            0:{String(secondsLeft).padStart(2, "0")}
+            {clockLabel(secondsLeft)}
           </span>
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">

@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CamMode } from "./city/CameraRig";
+import { clockLabel, useCountdown } from "@/lib/use-countdown";
 import { LogoMark } from "./Logo";
 import { Report } from "./Report";
 import { StockPanel } from "./StockPanel";
@@ -32,11 +33,11 @@ const SPEEDS = [
 
 /** Countdown for the daily game: seconds left on a clock that can't be paused. */
 function TimedClock({ month, last, msPerMonth, playing, done, onShow }: { month: number; last: number; msPerMonth: number; playing: boolean; done: boolean; onShow: () => void }) {
-  const left = done ? 0 : Math.max(0, Math.ceil(((last + 1 - month) * msPerMonth) / 1000));
+  const left = useCountdown(Math.round((last * msPerMonth) / 1000), playing, done);
   return (
     <>
       <div className="flex items-baseline gap-2">
-        <span className={`num text-3xl font-extrabold ${left <= 10 && playing ? "text-down" : "text-text"}`}>{`0:${String(left).padStart(2, "0")}`}</span>
+        <span className={`num text-3xl font-extrabold ${left <= 10 && playing ? "text-down" : "text-text"}`}>{clockLabel(left)}</span>
         <span className="text-xs text-sub">{done ? "Time's up" : playing ? "left" : "ready"}</span>
       </div>
       <div className="min-w-40 flex-1">
@@ -404,7 +405,7 @@ export function Board({
           <p className="mt-4 text-sm text-sub">
             {timed ? (
               <>
-                You have <strong className="text-text">{usd(STARTING_CASH)}</strong> and <strong className="text-text">{Math.round(((last + 1) * timed) / 1000)} seconds</strong>. The clock doesn&apos;t stop, so click towers and trade as the months fly by. Each trade costs $5.
+                You have <strong className="text-text">{usd(STARTING_CASH)}</strong> and <strong className="text-text">{Math.round((last * timed) / 1000)} seconds</strong>. The clock doesn&apos;t stop, so click towers and trade as the months fly by. Each trade costs $5.
               </>
             ) : (
               <>
