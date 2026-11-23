@@ -1,11 +1,11 @@
 "use client";
 
 import { clientId } from "@/lib/client-id";
-import { DAILY_MS_PER_MONTH, puzzleNumber, replayScore, shareGrid, type Puzzle, type Reveal } from "@/lib/daily";
+import { DAILY_MS_PER_MONTH, historyGrid, puzzleNumber, replayScore, type Puzzle, type Reveal } from "@/lib/daily";
 import type { Era } from "@/lib/eras";
 import { monthLabel, pct } from "@/lib/format";
 import { learnForWindow } from "@/lib/learn";
-import { recordDaily, type Badge } from "@/lib/progress";
+import { loadProgress, recordDaily, type Badge } from "@/lib/progress";
 import type { Standing } from "@/lib/standings";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -23,8 +23,6 @@ interface Result {
   marketRet: number | null;
   reveal: Reveal;
   standing: Standing | null;
-  /** Wordle-style squares, one per month: did you beat the market? */
-  grid?: string;
 }
 
 const PHONE_QUERY = "(max-width: 767px), (pointer: coarse) and (max-width: 1100px)";
@@ -149,7 +147,7 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "Couldn’t submit. Try again.");
-      const r: Result = { ...d, grid: scored.ok ? shareGrid(scored.values, puzzle.spy) : undefined };
+      const r: Result = d;
       try {
         window.localStorage.setItem(RESULT_KEY(puzzle.day), JSON.stringify(r));
       } catch {
@@ -170,8 +168,6 @@ function Finish({ game, onClose, puzzle, onResult }: EndProps & { puzzle: Puzzle
         You finished at <span className={ret >= 0 ? "text-up" : "text-down"}>{pct(ret)}</span>
       </h2>
       {endedEarly && <p className="mt-1 text-sm text-sub">You ended early, so your positions are held to Month {puzzle.months.length} for scoring.</p>}
-      {scored.ok && <p className="mt-3 text-2xl leading-tight whitespace-pre">{shareGrid(scored.values, puzzle.spy)}</p>}
-      <p className="mt-1 text-xs text-dim">One square per month: green when you beat the market, red when you trailed it.</p>
 
       {err && <p className="mt-3 text-sm text-down">{err}</p>}
       <div className="mt-6 flex flex-wrap gap-3">
@@ -191,6 +187,18 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
   const [stand, setStand] = useState<Standing | null>(result.standing);
   const [copied, setCopied] = useState(false);
   const [badges] = useState<Badge[]>(() => recordDaily(result.day, result.ret, result.marketRet !== null && result.ret > result.marketRet));
+  // Read after recording today, so today's square is included.
+  const [history] = useState(() => {
+    const days = { ...loadProgress().daily };
+    // Days saved before wins were tracked: work it out from that day's saved result, if there is one.
+    for (const [d, v] of Object.entries(days)) {
+      if (v.beat !== undefined) continue;
+      const saved = readResult(d);
+      days[d] = { ...v, beat: !!saved && saved.marketRet !== null && saved.ret > saved.marketRet };
+    }
+    const played = Object.values(days);
+    return { grid: historyGrid(days, result.day), played: played.length, beat: played.filter((d) => d.beat).length };
+  });
 
   useEffect(() => {
     // The distribution keeps growing as more people finish, so refresh it.
@@ -202,7 +210,7 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
 
   const share = async () => {
     const better = stand?.percentile != null ? `Beat ${Math.round(stand.percentile * 100)}% of ${stand.basis === "simulated" ? "simulated investors" : "players"}` : "";
-    const text = [`Market City Mystery Market #${puzzleNumber(result.day)}`, `${pct(result.ret)}${better ? `. ${better}` : ""}`, result.grid ?? "", "https://market-city-game.vercel.app/daily"].filter(Boolean).join("\n");
+    const text = [`Market City Mystery Market #${puzzleNumber(result.day)}`, `${pct(result.ret)}${better ? `. ${better}` : ""}`, history.grid, "https://market-city-game.vercel.app/daily"].filter(Boolean).join("\n");
     try {
       // Phones get the native share sheet (Messages, Instagram, etc.); laptops copy to the clipboard.
       if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
@@ -222,7 +230,14 @@ function Results({ result, onClose, onReplay, practice = false }: { result: Resu
         Mystery Market #{puzzleNumber(result.day)}, {result.day}
       </p>
       <p className={`num mt-1 text-center text-6xl font-extrabold ${result.ret >= 0 ? "text-up" : "text-down"}`}>{pct(result.ret)}</p>
-      {result.grid && <p className="mt-3 text-center text-2xl leading-tight whitespace-pre">{result.grid}</p>}
+      {history.grid && (
+        <div className="mt-3 text-center">
+          <p className="text-2xl leading-tight whitespace-pre">{history.grid}</p>
+          <p className="mt-1 text-xs text-dim">
+            Your Mystery Markets: {history.played} played, beat the market {history.beat} {history.beat === 1 ? "time" : "times"}. Green beat the market, red trailed it, white was a day off.
+          </p>
+        </div>
+      )}
       <p className="mt-3 text-center text-sm font-semibold text-sub">The time period was</p>
       <p className="sign text-center text-3xl font-extrabold">
         {monthLabel(result.reveal.from, true)} to {monthLabel(result.reveal.to, true)}

@@ -64,7 +64,8 @@ export function recordRound(eraId: string, ret: number, beatMarket: boolean, sho
 export function recordDaily(day: string, ret: number, beat: boolean): Badge[] {
   const before = new Set(earnedBadges(loadProgress()).map((b) => b.id));
   const p = loadProgress();
-  if (!p.daily[day]) p.daily[day] = { ret, beat };
+  // Older saves didn't record "beat", so fill it in when the same day is shown again.
+  if (!p.daily[day] || p.daily[day].beat === undefined) p.daily[day] = { ret: p.daily[day]?.ret ?? ret, beat };
   save(p);
   return earnedBadges(p).filter((b) => !before.has(b.id));
 }

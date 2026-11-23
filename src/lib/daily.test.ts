@@ -70,12 +70,14 @@ describe("sharing", () => {
     expect(puzzleNumber("2027-03-08")).toBe(107);
   });
 
-  it("makes a square per month comparing you with the market", async () => {
-    const { shareGrid } = await import("./daily");
-    const values = [100, 110, 105, 105.05, 120];
-    const market = [100, 105, 108, 108, 108];
-    expect(shareGrid(values, market)).toBe("🟩🟥⬜🟩");
-    const long = shareGrid(Array.from({ length: 24 }, (_, i) => 100 + i * 2), Array.from({ length: 24 }, () => 100));
-    expect(long.split("\n").map((r) => [...r].length)).toEqual([8, 8, 7]);
+  it("makes one square per day played, with gaps for missed days", async () => {
+    const { historyGrid } = await import("./daily");
+    expect(historyGrid({}, "2026-11-23")).toBe("");
+    expect(historyGrid({ "2026-11-22": { beat: false }, "2026-11-23": { beat: true } }, "2026-11-23")).toBe("🟥🟩");
+    expect(historyGrid({ "2026-11-20": { beat: true }, "2026-11-23": { beat: true } }, "2026-11-23")).toBe("🟩⬜⬜🟩");
+    const many = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [new Date(Date.UTC(2026, 9, 1 + i)).toISOString().slice(0, 10), { beat: true }]));
+    const rows = historyGrid(many, "2026-11-09").split("\n");
+    expect(rows).toHaveLength(4);
+    expect(rows.every((r) => [...r].length === 7)).toBe(true);
   });
 });

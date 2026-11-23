@@ -20,21 +20,25 @@ export function puzzleNumber(day: string) {
   return Math.round((Date.parse(`${day}T12:00:00Z`) - Date.parse(`${LAUNCH_DAY}T12:00:00Z`)) / 86400000) + 1;
 }
 
+function addDays(day: string, n: number) {
+  return new Date(Date.parse(`${day}T12:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+}
+
 /**
- * One square per month: 🟩 when your portfolio beat the market that month, 🟥 when it lagged,
- * ⬜ when they were within a tenth of a percent. Rows of eight, like a Wordle grid.
+ * Your Mystery Market history, one square per day from your first game to today:
+ * 🟩 beat the market, 🟥 trailed it, ⬜ didn't play. Rows of seven, a week per row,
+ * showing up to the last four weeks.
  */
-export function shareGrid(values: number[], market: (number | null)[]) {
+export function historyGrid(days: Record<string, { beat: boolean }>, today: string) {
+  const played = Object.keys(days).filter((d) => d <= today).sort();
+  if (played.length === 0) return "";
+  let start = played[0];
+  const earliest = addDays(today, -27);
+  if (start < earliest) start = earliest;
   const squares: string[] = [];
-  for (let m = 1; m < values.length; m++) {
-    const a = market[m - 1];
-    const b = market[m];
-    if (a == null || b == null || !values[m - 1]) continue;
-    const diff = values[m] / values[m - 1] - b / a;
-    squares.push(Math.abs(diff) < 0.001 ? "⬜" : diff > 0 ? "🟩" : "🟥");
-  }
+  for (let d = start; d <= today; d = addDays(d, 1)) squares.push(days[d] ? (days[d].beat ? "🟩" : "🟥") : "⬜");
   const rows: string[] = [];
-  for (let i = 0; i < squares.length; i += 8) rows.push(squares.slice(i, i + 8).join(""));
+  for (let i = 0; i < squares.length; i += 7) rows.push(squares.slice(i, i + 7).join(""));
   return rows.join("\n");
 }
 export const DAILY_TZ = "America/New_York";
